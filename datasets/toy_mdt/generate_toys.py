@@ -108,7 +108,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    cf_file = utils.import_module("cf", "configs.py")
+    cf_file = utils.import_module("cf", "./configs.py")
     cf = cf_file.configs()
 
     class_diameters = {

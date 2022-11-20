@@ -34,7 +34,9 @@ class Configs(DefaultConfigs):
         #         Prepro        #
         #########################
 
-        self.pp_rootdir = os.path.join('/home/gregor/datasets/toy', "cyl1ps_dev")
+        self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy', "cyl1ps_dev")
+        self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/MULTI', "cyl1ps_dev")
+        self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_OL/Training_OL_blocks_smallset', "")
         self.pp_npz_dir = self.pp_rootdir+"_npz"
 
         self.pre_crop_size = [320,320,8] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
@@ -85,7 +87,9 @@ class Configs(DefaultConfigs):
         #         I/O           #
         #########################
 
-        self.data_sourcedir = '/home/gregor/datasets/toy/cyl1ps_dev'
+        #self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev'
+
+        self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_OL/Training_OL_blocks_smallset/'
 
         if server_env:
             self.data_sourcedir = '/datasets/datasets_ramien/toy/data/cyl1ps_dev_npz'
@@ -107,16 +111,20 @@ class Configs(DefaultConfigs):
         #########################
 
         # one out of [2, 3]. dimension the model operates in.
-        self.dim = 2
+        self.dim = 3
 
         # 'class', 'regression', 'regression_bin', 'regression_ken_gal'
         # currently only tested mode is a single-task at a time (i.e., only one task in below list)
         # but, in principle, tasks could be combined (e.g., object classes and regression per class)
-        self.prediction_tasks = ['class', ]
+        self.prediction_tasks = ['class',]
+        #self.prediction_tasks = ['class', 'regression']   ### TIGER ADDED REGRESSION TO ENABLE THE BINWIDTH TO BE SET
+                        # ^^^ MUST RUN IN REGRESSION MODE FOR "generate_toys.py" to have bin_edges set
+
+
 
         self.start_filts = 48 if self.dim == 2 else 18
         self.end_filts = self.start_filts * 4 if self.dim == 2 else self.start_filts * 2
-        self.res_architecture = 'resnet50' # 'resnet101' , 'resnet50'
+        self.res_architecture = 'resnet101' # 'resnet101' , 'resnet50'  ### TIGER CHANGED TO 101
         self.norm = 'instance_norm' # one of None, 'instance_norm', 'batch_norm'
         self.relu = 'relu'
         # one of 'xavier_uniform', 'xavier_normal', or 'kaiming_normal', None (=default = 'kaiming_uniform')
@@ -129,7 +137,9 @@ class Configs(DefaultConfigs):
         #      Data Loader      #
         #########################
 
-        self.num_epochs = 24
+        ##self.num_epochs = 24
+        
+        self.num_epochs = 50
         self.num_train_batches = 100 if self.dim == 2 else 180
         self.batch_size = 20 if self.dim == 2 else 8
 

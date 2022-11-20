@@ -402,6 +402,10 @@ class BatchGenerator(SlimDataLoaderBase):
         self.stats = {"roi_counts": np.zeros(len(self.unique_ts,), dtype='uint32'),
                       "empty_counts": np.zeros(len(self.unique_ts,), dtype='uint32')}
 
+
+        ### HACK - TIGER plot == 0
+        plot = False
+
         if plot:
             os.makedirs(self.plot_dir, exist_ok=True)
             plg.plot_batchgen_distribution(self.cf, self.dataset_pids, self.p_probs, self.balance_target,

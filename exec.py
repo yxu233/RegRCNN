@@ -50,6 +50,13 @@ def train(cf, logger):
 
     # -------------- inits and settings -----------------
     net = model.net(cf, logger).cuda()
+    
+    
+    # device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    # print(device)
+    # net.to(device)    
+        
+    
     if cf.optimizer == "ADAMW":
         optimizer = torch.optim.AdamW(utils.parse_params_for_optim(net, weight_decay=cf.weight_decay,
                                                                    exclude_from_wd=cf.exclude_from_wd),
@@ -89,6 +96,10 @@ def train(cf, logger):
         for i in range(cf.num_train_batches):
             logger.time("train_batch_loadfw")
             batch = next(batch_gen['train'])
+            
+            ### SEND THIS BATCH TO DEVICE 1???
+            
+            
             batch_gen['train'].generator.stats['roi_counts'] += batch['roi_counts']
             batch_gen['train'].generator.stats['empty_counts'] += batch['empty_counts']
 
@@ -208,11 +219,25 @@ if __name__ == '__main__':
     stime = time.time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_name', type=str, default='toy',
+    # parser.add_argument('--dataset_name', type=str, default='toy',
+    #                     help="path to the dataset-specific code in source_dir/datasets")
+    # parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing',
+    #                     help='path to experiment dir. will be created if non existent.')
+    
+    
+    parser.add_argument('--dataset_name', type=str, default='OL_data',
                         help="path to the dataset-specific code in source_dir/datasets")
-    parser.add_argument('--exp_dir', type=str, default='/home/gregor/Documents/regrcnn/datasets/toy/experiments/dev',
+    parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/',
                         help='path to experiment dir. will be created if non existent.')
+    
+    
+    
     parser.add_argument('-m', '--mode', type=str,  default='train_test', help='one out of: create_exp, analysis, train, train_test, or test')
+    #parser.add_argument('-m', '--mode', type=str,  default='test', help='one out of: create_exp, analysis, train, train_test, or test')
+    
+    
+    
+    
     parser.add_argument('-f', '--folds', nargs='+', type=int, default=None, help='None runs over all folds in CV. otherwise specify list of folds.')
     parser.add_argument('--server_env', default=False, action='store_true', help='change IO settings to deploy models on a cluster.')
     parser.add_argument('--data_dest', type=str, default=None, help="path to final data folder if different from config")

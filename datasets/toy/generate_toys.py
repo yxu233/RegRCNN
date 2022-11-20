@@ -344,25 +344,47 @@ class ToyGenerator(object):
             np.save(os.path.join(out_dir, '{}_seg.npy'.format(s_id)), seg)
 
 
+        ### HACK - TIGER ADDED for visualization
+        # import matplotlib.pyplot as plt       
+        # def plot_max(im, ax=0, fig_num=1):
+        #      max_im = np.amax(im, axis=ax)
+        #      plt.figure(fig_num); plt.imshow(max_im[:, :])
+        #      return max_im
+        
+        # plot_max(img, ax=-1)
+        # plot_max(seg, ax=-1)
+            
+
+
         return [out_dir, out_path, class_ids, regress_targets, fg_slices, undistorted_rg_targets, str(s_id)]
 
     def create_sets(self, processes=os.cpu_count()):
         """ Create whole training and test set, save to files under given directory cf.out_dir.
         :param processes: nr of parallel processes.
         """
-
+        processes = 1  ### TIGER SLOW DOWN
 
         print('starting creation of {} images.'.format(len(self.mp_args)))
         shutil.copyfile("configs.py", os.path.join(self.cf.pp_rootdir, 'applied_configs.py'))
         pool = Pool(processes=processes)
-        try:
-            imgs_info = pool.map(self.create_sample, self.mp_args)
-        except AttributeError as e:
-            raise AttributeError("{}\nAre configs tasks = ['class', 'regression'] (both)?".format(e))
+        
+
+        # try:
+        #     imgs_info = pool.map(self.create_sample, self.mp_args)
+        # except AttributeError as e:
+        #     raise AttributeError("{}\nAre configs tasks = ['class', 'regression'] (both)?".format(e))
+        # imgs_info = [img for img in imgs_info if img is not None]
+        # pool.close()
+        # pool.join()
+        
+        ### TIGER ADDED --- no multi-threading
+
+        imgs_info = map(self.create_sample, self.mp_args)
         imgs_info = [img for img in imgs_info if img is not None]
-        pool.close()
-        pool.join()
         print("created a total of {} samples.".format(len(imgs_info)))
+
+
+        ###
 
         self.df = pd.DataFrame.from_records(imgs_info, columns=['out_dir', 'path', 'class_ids', 'regression_vectors',
                                                                 'fg_slices', 'undistorted_rg_vectors', 'pid'])

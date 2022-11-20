@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Nov 17 23:20:55 2022
+
+@author: user
+"""
+
+import numpy as np
+
+### a is float 16, b is uint8 segmentation
+
+a = np.load('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev/train/20.npy')
+b = np.load('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev/train/20_seg.npy')
+
+
+import napari
+viewer = napari.view_image(a)
+viewer.add_image(b)
+
+import _pickle as cPickle
+
+with open(r"/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev/train/info_df.pickle", "rb") as input_file:
+     e = cPickle.load(input_file)
+
+
+
+zzz
+
+
+a = np.load('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev_npz/train/6.npz')
+b = np.load('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev_npz/train/6_seg.npz')
+
+a = a['6']
+b = b['6_seg']
+
+# import napari
+# viewer = napari.view_image(a)
+# viewer.add_image(b)
+
+
+
+
+
+import _pickle as cPickle
+
+with open(r"/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev_npz/train/info_df.pickle", "rb") as input_file:
+     e = cPickle.load(input_file)
+     
+     
+     
+     
+zzz
+     
+a = np.load('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/MULTI/cyl1ps_dev/train/20.npy')
+b = np.load('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/MULTI/cyl1ps_dev/train/20_seg.npy')
+
+
+import napari
+viewer = napari.view_image(a)
+viewer.add_image(b)
+
+import _pickle as cPickle
+
+with open(r"/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/MULTI/cyl1ps_dev/train/info_df.pickle", "rb") as input_file:
+     e = cPickle.load(input_file)
+     
+     
+     
+     
+     
+     
+zzz
+     
+a = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/24.npy')
+b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/24_seg.npy')
+
+
+import napari
+viewer = napari.view_image(a)
+viewer.add_image(b)
+
+import _pickle as cPickle
+
+with open(r"/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/info_df.pickle", "rb") as input_file:
+     e = cPickle.load(input_file)
+     
+
+
+
+
+
+

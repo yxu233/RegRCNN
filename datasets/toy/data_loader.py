@@ -251,8 +251,13 @@ class BatchGenerator(dutils.BatchGenerator):
                     batch_roi_counts[tix] += non_zero
                     batch_empty_counts[tix] += int(non_zero==0)
                     # todo remove assert when checked
+                    
+
                     if not np.any(seg):
                         assert non_zero==0
+                    
+                        
+                        
             elif self.cf.dim == 2:
                 for tix in range(len(self.unique_ts)):
                     non_zero = np.count_nonzero(patient[self.balance_target][np.unique(seg[seg>0]) - 1] == self.unique_ts[tix])

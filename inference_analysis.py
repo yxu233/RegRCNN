@@ -50,8 +50,32 @@ def plot_forward(pid, slices=None):
             results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
 
         out_file = os.path.join(anal_dir, "straight_inference_fold_{}_pid_{}".format(str(cf.fold), pid))
+        
+        
+        ### TIGER - SAVE AS TIFF
+        
+        seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1)
+        import tifffile as tiff
+        tiff.imwrite(out_file + '_seg.tif', np.asarray(seg_im, dtype=np.uint8),
+                      imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+        
+
+        input_im = np.moveaxis(batch['data'], -1, 1)
+
+        tiff.imwrite(out_file + '_input_im.tif', np.asarray(input_im, dtype=np.uint8),
+                      imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+        
+
+        
+        ### This below hangs
+        
         plg.view_batch(cf, batch, res_dict=results_dict, show_info=False, legend=True, show_gt_labels=True,
                                   out_file=out_file, sample_picks=slices)
+        
+        
+        
+        
+        
 
 
 def plot_merged_boxes(results_list, pid, plot_mods=False, show_seg_ids="all", show_info=True, show_gt_boxes=True,
@@ -86,15 +110,18 @@ if __name__=="__main__":
     class Args():
         def __init__(self):
             #self.dataset_name = "datasets/prostate"
-            self.dataset_name = "datasets/lidc"
+            #self.dataset_name = "datasets/lidc"
+            self.dataset_name = "datasets/toy"
             #self.exp_dir = "datasets/toy/experiments/mrcnnal2d_clkengal"  # detunet2d_di_bs16_ps512"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_retinau3d_cl_bs6"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_frcnn3d_cl_bs6"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments_t2/gs6071_mrcnn3d_cl_bs6_lessaug"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_detfpn3d_cl_bs6"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/lidc_sa/experiments/ms12345_mrcnn3d_rgbin_bs8"
-            self.exp_dir = '/home/gregor/Documents/medicaldetectiontoolkit/datasets/lidc/experiments/ms12345_mrcnn3d_rg_bs8'
+            #self.exp_dir = '/home/gregor/Documents/medicaldetectiontoolkit/datasets/lidc/experiments/ms12345_mrcnn3d_rg_bs8'
             #self.exp_dir = '/home/gregor/Documents/medicaldetectiontoolkit/datasets/lidc/experiments/ms12345_mrcnn3d_rgbin_bs8'
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/'
 
             self.server_env = False
     args = Args()
@@ -108,8 +135,8 @@ if __name__=="__main__":
     cf.test_dir = cf.exp_dir
 
     pid = '0811a'
-    cf.fold = find_pid_in_splits(pid)
-    #cf.fold = 0
+    #cf.fold = find_pid_in_splits(pid)   ### TIGER -- super buggy for some reason...
+    cf.fold = 0
     cf.merge_2D_to_3D_preds = False
     if cf.merge_2D_to_3D_preds:
         cf.dim==3
@@ -124,8 +151,15 @@ if __name__=="__main__":
     test_evaluator = Evaluator(cf, logger, mode='test')
     #val_gen = data_loader.get_train_generators(cf, logger, data_statistics=False)['val_sampling']
     batch_gen = data_loader.get_test_generator(cf, logger)
-    weight_paths = [os.path.join(cf.fold_dir, '{}_best_params.pth'.format(rank)) for rank in
-                    test_predictor.epoch_ranking]
+    #weight_paths = [os.path.join(cf.fold_dir, '{}_best_params.pth'.format(rank)) for rank in
+    #                test_predictor.epoch_ranking]
+    #weight_path = weight_paths[rank]
+    
+    ### TIGER - missing currently ability to find best model
+    weight_path = os.path.join(cf.fold_dir, '47_best_params.pth') 
+    
+    
+    
     try:
         pids = batch_gen["test"].dataset_pids
     except:
@@ -136,7 +170,7 @@ if __name__=="__main__":
 
     # load already trained model weights
     rank = 0
-    weight_path = weight_paths[rank]
+    
     with torch.no_grad():
         pass
         net.load_state_dict(torch.load(weight_path))
@@ -146,7 +180,7 @@ if __name__=="__main__":
         os.mkdir(anal_dir)
 
     #plot_train_forward()
-    #plot_forward(pids[0])
+    plot_forward(pids[0])
     #net.actual_dims()
     #batch_gen = data_loader.get_test_generator(cf, logger)
     merged_boxes_file = os.path.join(cf.fold_dir, "merged_box_results")

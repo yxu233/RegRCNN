@@ -215,7 +215,12 @@ class Nvidia_GPU_Logger(object):
 
         nvidia_smi.nvmlInit()
         # card id 0 hardcoded here, there is also a call to get all available card ids, so we could iterate
-        self.gpu_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+        
+        ### TIGER - change this to GPU device 1
+        self.gpu_handle = nvidia_smi.nvmlDeviceGetHandleByIndex(1)
+        
+        
+        
         util_res = nvidia_smi.nvmlDeviceGetUtilizationRates(self.gpu_handle)
         #mem_res = nvidia_smi.nvmlDeviceGetMemoryInfo(self.gpu_handle)
         # current_vals = {"gpu_mem_alloc": mem_res.used / (1024**2), "gpu_graphics_util": int(gpu_util['graphics']),
@@ -425,6 +430,12 @@ class CombinedLogger(object):
             self.gpu_logger = Nvidia_GPU_Logger()
             self.sysmetrics_start_time = time.time()
             self.sys_metrics_process = split_off_process(target=self.sysmetrics_loop, daemon=True)
+            
+            
+            ### TIGER - dont do pooled threading here so can debug
+            #self.sys_metrics_process = self.sysmetrics_loop()
+            
+            
             # self.thread = threading.Thread(target=self.sysmetrics_loop)
             # self.thread.daemon = True
             # self.thread.start()
@@ -717,17 +728,33 @@ def prep_exp(dataset_path, exp_path, server_env, use_stored_settings=True, is_tr
         else:  # this case overwrites settings files in exp dir, i.e., default_configs, configs, backbone, model
             os.makedirs(exp_path, exist_ok=True)
             # run training with source code info and copy snapshot of model to exp_dir for later testing (overwrite scripts if exp_dir already exists.)
-            subprocess.call('cp {} {}'.format('default_configs.py', os.path.join(exp_path, 'default_configs.py')),
-                            shell=True)
-            subprocess.call(
-                'cp {} {}'.format(os.path.join(dataset_path, 'configs.py'), os.path.join(exp_path, 'configs.py')),
-                shell=True)
+            # subprocess.call('cp {} {}'.format('default_configs.py', os.path.join(exp_path, 'default_configs.py')),
+            #                 shell=True)
+            # subprocess.call(
+            #     'cp {} {}'.format(os.path.join(dataset_path, 'configs.py'), os.path.join(exp_path, 'configs.py')),
+            #     shell=True)
+            # cf_file = import_module('cf_file', os.path.join(dataset_path, 'configs.py'))
+            # cf = cf_file.Configs(server_env)
+            # subprocess.call('cp {} {}'.format(cf.model_path, os.path.join(exp_path, 'model.py')), shell=True)
+            # subprocess.call('cp {} {}'.format(cf.backbone_path, os.path.join(exp_path, 'backbone.py')), shell=True)
+            # if os.path.isfile(os.path.join(exp_path, "fold_ids.pickle")):
+            #     subprocess.call('rm {}'.format(os.path.join(exp_path, "fold_ids.pickle")), shell=True)
+
+            ### TIGER FIXED THIS FOR FOLDERS WITH WHITESPACE
+
+            subprocess.call(['cp','default_configs.py', exp_path])
+            subprocess.call(['cp', dataset_path + '/configs.py', exp_path])
             cf_file = import_module('cf_file', os.path.join(dataset_path, 'configs.py'))
-            cf = cf_file.Configs(server_env)
-            subprocess.call('cp {} {}'.format(cf.model_path, os.path.join(exp_path, 'model.py')), shell=True)
-            subprocess.call('cp {} {}'.format(cf.backbone_path, os.path.join(exp_path, 'backbone.py')), shell=True)
+            cf = cf_file.Configs(server_env)          
+        
+            subprocess.call(['cp', cf.model_path, exp_path + '/model.py'])
+            subprocess.call(['cp', cf.backbone_path, exp_path + '/backbone.py'])
+
             if os.path.isfile(os.path.join(exp_path, "fold_ids.pickle")):
-                subprocess.call('rm {}'.format(os.path.join(exp_path, "fold_ids.pickle")), shell=True)
+                subprocess.call(['rm', exp_path + '/fold_ids.pickle'])
+
+
+
 
     else:  # testing, use model and backbone stored in exp dir.
         cf_file = import_module('cf', os.path.join(exp_path, 'configs.py'))

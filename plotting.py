@@ -894,6 +894,7 @@ def view_batch(cf, batch, res_dict=None, out_file=None, legend=True, show_info=T
     sample_ics, z_ics = sorted(sample_ics), sorted(z_ics)
     row = 0  # current row
     for s_count, s_ix in enumerate(sample_ics):
+        print(s_ix)
         for z_ix in z_ics:
             col = 0  # current col
             # ----visualise input data -------------

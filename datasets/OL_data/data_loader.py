@@ -253,8 +253,10 @@ class BatchGenerator(dutils.BatchGenerator):
                     # todo remove assert when checked
                     
 
-                    if not np.any(seg):
-                        assert non_zero==0
+                    ### HACK - TIGER JUST COMMENTED IT OUT - FIGURE OUT WHAT IT DO
+
+                    # if not np.any(seg):
+                    #     assert non_zero==0
                     
                         
                         
@@ -297,7 +299,8 @@ class PatientBatchIterator(dutils.PatientBatchIterator):
 
         if (mode=="validation" and hasattr(self.cf, 'val_against_exact_gt') and self.cf.val_against_exact_gt) or \
                 (mode == 'test' and self.cf.test_against_exact_gt):
-            self.gt_prefix = 'exact_'
+            #self.gt_prefix = 'exact_'    ### TIGER REMOVED "exact_"
+            self.gt_prefix = ''
             print("PatientIterator: Loading exact Ground Truths.")
         else:
             self.gt_prefix = ''
@@ -468,6 +471,12 @@ def create_data_gen_pipeline(cf, patient_data, do_aug=True, **kwargs):
     my_transforms.append(ConvertSegToBoundingBoxCoordinates(cf.dim, cf.roi_items, False, cf.class_specific_seg))
     all_transforms = Compose(my_transforms)
     # multithreaded_generator = SingleThreadedAugmenter(data_gen, all_transforms)
+    
+    
+    ### HACK - TIGER prevent multithreading for debug
+    #data_gen.n_filled_threads = 1
+    
+    
     multithreaded_generator = MultiThreadedAugmenter(data_gen, all_transforms, num_processes=data_gen.n_filled_threads,
                                                      seeds=range(data_gen.n_filled_threads))
     return multithreaded_generator

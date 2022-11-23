@@ -231,9 +231,10 @@ if __name__ == '__main__':
                         help='path to experiment dir. will be created if non existent.')
     
     
-    
-    parser.add_argument('-m', '--mode', type=str,  default='train_test', help='one out of: create_exp, analysis, train, train_test, or test')
+    #parser.add_argument('-m', '--mode', type=str,  default='train_test', help='one out of: create_exp, analysis, train, train_test, or test')
     #parser.add_argument('-m', '--mode', type=str,  default='test', help='one out of: create_exp, analysis, train, train_test, or test')
+    
+    parser.add_argument('-m', '--mode', type=str,  default='create_exp', help='one out of: create_exp, analysis, train, train_test, or test')
     
     
     

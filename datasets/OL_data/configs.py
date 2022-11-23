@@ -40,7 +40,13 @@ class Configs(DefaultConfigs):
         self.pp_npz_dir = self.pp_rootdir+"_npz"
 
         #self.pre_crop_size = [320,320,8] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
-        self.pre_crop_size = [128,128,8] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
+        
+        #self.pre_crop_size = [128,128,8] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
+        
+        
+        self.pre_crop_size = [128,128,32] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
+        
+        #self.pre_crop_size = [256,256,32] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
         self.min_2d_radius = 6 #in pixels
         self.n_train_samples, self.n_test_samples = 1200, 1000
 
@@ -92,8 +98,8 @@ class Configs(DefaultConfigs):
 
         self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger'
 
-        if server_env:
-            self.data_sourcedir = '/datasets/datasets_ramien/toy/data/cyl1ps_dev_npz'
+        # if server_env:
+        #     self.data_sourcedir = '/datasets/datasets_ramien/toy/data/cyl1ps_dev_npz'
 
 
         self.test_data_sourcedir = os.path.join(self.data_sourcedir, 'test')
@@ -112,7 +118,7 @@ class Configs(DefaultConfigs):
         #########################
 
         # one out of [2, 3]. dimension the model operates in.
-        self.dim = 3
+        self.dim = 2
 
         # 'class', 'regression', 'regression_bin', 'regression_ken_gal'
         # currently only tested mode is a single-task at a time (i.e., only one task in below list)
@@ -140,7 +146,7 @@ class Configs(DefaultConfigs):
 
         ##self.num_epochs = 24
         
-        self.num_epochs = 50
+        self.num_epochs = 80
         self.num_train_batches = 100 if self.dim == 2 else 180
         self.batch_size = 20 if self.dim == 2 else 8
 
@@ -153,7 +159,12 @@ class Configs(DefaultConfigs):
         self.plot_bg_chan = 0
         self.crop_margin = [20, 20, 1]  # has to be smaller than respective patch_size//2
         self.patch_size_2D = self.pre_crop_size[:2]
-        self.patch_size_3D = self.pre_crop_size[:2]+[8]
+        
+        
+        ### TIGER CHANGED THIS - dont want it patching
+        #self.patch_size_3D = self.pre_crop_size[:2]+[8]
+        self.patch_size_3D = self.pre_crop_size
+        
 
         # patch_size to be used for training. pre_crop_size is the patch_size before data augmentation.
         self.patch_size = self.patch_size_2D if self.dim == 2 else self.patch_size_3D
@@ -226,7 +237,14 @@ class Configs(DefaultConfigs):
         #########################
         #   Data Augmentation   #
         #########################
-        self.do_aug = True
+        
+        
+        #self.do_aug = True
+        self.do_aug = False      ### TIGER - turned off data augmentation
+        
+        
+        
+        
         self.da_kwargs = {
             'mirror': True,
             'mirror_axes': tuple(np.arange(0, self.dim, 1)),
@@ -258,7 +276,7 @@ class Configs(DefaultConfigs):
 
         # decide whether to validate on entire patient volumes (like testing) or sampled patches (like training)
         # the former is morge accurate, while the latter is faster (depending on volume size)
-        self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
+        self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
         if self.val_mode == 'val_patient':
             self.max_val_patients = 220  # if 'all' iterates over entire val_set once.
         if self.val_mode == 'val_sampling':

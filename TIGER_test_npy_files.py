@@ -72,8 +72,8 @@ with open(r"/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/MU
      
 zzz
      
-a = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/24.npy')
-b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/24_seg.npy')
+a = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/test/906.npy')
+b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/test/906_seg.npy')
 
 
 import napari

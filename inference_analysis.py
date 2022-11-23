@@ -15,6 +15,17 @@ import utils.model_utils as mutils
 from predictor import Predictor
 from evaluator import Evaluator
 
+import matplotlib.pyplot as plt
+
+
+def plot_max(im, ax=0, plot=1):
+     max_im = np.amax(im, axis=ax)
+     if plot:
+         plt.figure(); plt.imshow(max_im)
+     
+     return max_im
+
+
 
 def find_pid_in_splits(pid, exp_dir=None):
     if exp_dir is None:
@@ -35,11 +46,53 @@ def find_pid_in_splits(pid, exp_dir=None):
 def plot_train_forward(slices=None):
     with torch.no_grad():
         batch = next(val_gen)
+        
         results_dict = net.train_forward(batch, is_validation=True) #seg preds are int preds already
-
+        print(results_dict['seg_preds'].shape)
+        print(batch['data'].shape)
+        
+        
         out_file = os.path.join(anal_dir, "straight_val_inference_fold_{}".format(str(cf.fold)))
-        plg.view_batch(cf, batch, res_dict=results_dict, show_info=False, legend=True,
-                                  out_file=out_file, slices=slices)
+        #plg.view_batch(cf, batch, res_dict=results_dict, show_info=False, legend=True,
+        #                          out_file=out_file)#, slices=slices)
+
+        ### TIGER - SAVE AS TIFF
+        truth_im = np.expand_dims(batch['seg'], axis=0)
+        
+        
+        ### if 3D
+        #seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1)    
+        import tifffile as tiff
+        tiff.imwrite(out_file + '_TRUTH.tif', np.asarray(truth_im, dtype=np.uint8),
+                      imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+        
+                
+        seg_im = np.expand_dims(results_dict['seg_preds'], axis=0)
+        ### if 3D
+        #seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1)    
+        import tifffile as tiff
+        tiff.imwrite(out_file + '_seg.tif', np.asarray(seg_im, dtype=np.uint8),
+                      imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+        
+
+        input_im = np.expand_dims(batch['data'], axis=0)
+        
+        
+        ### if 3D
+        #input_im = np.moveaxis(batch['data'], -1, 1)
+        tiff.imwrite(out_file + '_input_im.tif', np.asarray(input_im, dtype=np.uint16),
+                      imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+        
+
+        
+
+        ### TIGER ADDED
+        import utils.exp_utils as utils
+        print('Plotting output')
+        utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,
+                                show_gt_labels=True, get_time="val-example plot",
+                                out_file=os.path.join(cf.plot_dir, 'batch_example_val_{}.png'.format(cf.fold)))
+
 
 def plot_forward(pid, slices=None):
     with torch.no_grad():
@@ -51,27 +104,66 @@ def plot_forward(pid, slices=None):
 
         out_file = os.path.join(anal_dir, "straight_inference_fold_{}_pid_{}".format(str(cf.fold), pid))
         
-        
+
+
+
+        print(results_dict['seg_preds'].shape)
+        print(batch['data'].shape)
+
         ### TIGER - SAVE AS TIFF
+        truth_im = np.expand_dims(batch['seg'], axis=0)
         
-        seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1)
+        
+        ### if 3D
+        #seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1)    
+        import tifffile as tiff
+        tiff.imwrite(out_file + '_TRUTH.tif', np.asarray(truth_im, dtype=np.uint8),
+                      imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+        
+        
+
+        roi_mask = np.expand_dims(batch['roi_masks'][0], axis=0)
+        
+        
+        ### if 3D
+        #seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1)    
+        import tifffile as tiff
+        tiff.imwrite(out_file + '_roi_mask.tif', np.asarray(roi_mask, dtype=np.uint8),
+                      imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+                
+      
+
+    
+        seg_im = np.expand_dims(results_dict['seg_preds'], axis=0)
+        
+        
+        ### if 3D
+        #seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1)    
         import tifffile as tiff
         tiff.imwrite(out_file + '_seg.tif', np.asarray(seg_im, dtype=np.uint8),
                       imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
         
 
-        input_im = np.moveaxis(batch['data'], -1, 1)
-
-        tiff.imwrite(out_file + '_input_im.tif', np.asarray(input_im, dtype=np.uint8),
+        input_im = np.expand_dims(batch['data'], axis=0)
+        
+        
+        ### if 3D
+        #input_im = np.moveaxis(batch['data'], -1, 1)
+        tiff.imwrite(out_file + '_input_im.tif', np.asarray(input_im, dtype=np.uint16),
                       imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
         
+
 
         
         ### This below hangs
         
-        plg.view_batch(cf, batch, res_dict=results_dict, show_info=False, legend=True, show_gt_labels=True,
-                                  out_file=out_file, sample_picks=slices)
+        # plg.view_batch(cf, batch, res_dict=results_dict, show_info=False, legend=True, show_gt_labels=True,
+        #                           out_file=out_file, sample_picks=slices, has_colorchannels=False)
         
+        print('Plotting output')
+        utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,
+                                show_gt_labels=True, get_time="val-example plot",
+                                out_file=os.path.join(cf.plot_dir, 'batch_SINGLE_PID_{}.png'.format(pid)))
         
         
         
@@ -112,6 +204,8 @@ if __name__=="__main__":
             #self.dataset_name = "datasets/prostate"
             #self.dataset_name = "datasets/lidc"
             self.dataset_name = "datasets/toy"
+            
+            self.dataset_name = "datasets/OL_data"
             #self.exp_dir = "datasets/toy/experiments/mrcnnal2d_clkengal"  # detunet2d_di_bs16_ps512"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_retinau3d_cl_bs6"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_frcnn3d_cl_bs6"
@@ -122,6 +216,8 @@ if __name__=="__main__":
             #self.exp_dir = '/home/gregor/Documents/medicaldetectiontoolkit/datasets/lidc/experiments/ms12345_mrcnn3d_rgbin_bs8'
             
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/'
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/'
 
             self.server_env = False
     args = Args()
@@ -134,7 +230,7 @@ if __name__=="__main__":
     cf.exp_dir = args.exp_dir
     cf.test_dir = cf.exp_dir
 
-    pid = '0811a'
+    #pid = '0811a'
     #cf.fold = find_pid_in_splits(pid)   ### TIGER -- super buggy for some reason...
     cf.fold = 0
     cf.merge_2D_to_3D_preds = False
@@ -149,14 +245,23 @@ if __name__=="__main__":
     net = model.net(cf, logger).cuda()
     test_predictor = Predictor(cf, None, logger, mode='test')
     test_evaluator = Evaluator(cf, logger, mode='test')
-    #val_gen = data_loader.get_train_generators(cf, logger, data_statistics=False)['val_sampling']
+    
+    
+    
+    cf.plot_dir = anal_dir ### TIGER ADDED FOR VAL_GEN
+    val_gen = data_loader.get_train_generators(cf, logger, data_statistics=False)['val_sampling']
     batch_gen = data_loader.get_test_generator(cf, logger)
     #weight_paths = [os.path.join(cf.fold_dir, '{}_best_params.pth'.format(rank)) for rank in
     #                test_predictor.epoch_ranking]
     #weight_path = weight_paths[rank]
     
     ### TIGER - missing currently ability to find best model
-    weight_path = os.path.join(cf.fold_dir, '47_best_params.pth') 
+    weight_path = os.path.join(cf.fold_dir, '77_best_params.pth') 
+    
+    
+    #weight_path = os.path.join(cf.fold_dir, '251_best_params.pth') 
+    
+    #weight_path = os.path.join(cf.fold_dir, '68_best_params.pth') 
     
     
     
@@ -179,8 +284,11 @@ if __name__=="__main__":
     if not os.path.isdir(anal_dir):
         os.mkdir(anal_dir)
 
-    #plot_train_forward()
-    plot_forward(pids[0])
+    
+    plot_train_forward(val_gen)
+    #plot_forward(pids[0])
+    plot_forward('906')
+    
     #net.actual_dims()
     #batch_gen = data_loader.get_test_generator(cf, logger)
     merged_boxes_file = os.path.join(cf.fold_dir, "merged_box_results")

@@ -118,7 +118,7 @@ class Configs(DefaultConfigs):
         #########################
 
         # one out of [2, 3]. dimension the model operates in.
-        self.dim = 2
+        self.dim = 3
 
         # 'class', 'regression', 'regression_bin', 'regression_ken_gal'
         # currently only tested mode is a single-task at a time (i.e., only one task in below list)
@@ -239,8 +239,8 @@ class Configs(DefaultConfigs):
         #########################
         
         
-        #self.do_aug = True
-        self.do_aug = False      ### TIGER - turned off data augmentation
+        self.do_aug = True
+        #self.do_aug = False      ### TIGER - turned off data augmentation
         
         
         
@@ -276,7 +276,9 @@ class Configs(DefaultConfigs):
 
         # decide whether to validate on entire patient volumes (like testing) or sampled patches (like training)
         # the former is morge accurate, while the latter is faster (depending on volume size)
-        self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
+        #self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
+        
+        self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
         if self.val_mode == 'val_patient':
             self.max_val_patients = 220  # if 'all' iterates over entire val_set once.
         if self.val_mode == 'val_sampling':
@@ -407,6 +409,12 @@ class Configs(DefaultConfigs):
 
     def add_mrcnn_configs(self):
 
+        
+      ### TIGER:
+      #self.learning_rate = [3e-5] * self.num_epochs
+      #self.dynamic_lr_scheduling = False  # with scheduler set in exec  
+                  ### ^^^need more than 100 epochs for this!!!
+
       self.learning_rate = [3e-4] * self.num_epochs
       self.dynamic_lr_scheduling = True  # with scheduler set in exec
       self.scheduling_criterion = max(self.model_selection_criteria, key=self.model_selection_criteria.get)
@@ -445,6 +453,9 @@ class Configs(DefaultConfigs):
       self.rpn_nms_threshold = max(0.7, self.model_max_iou_resolution)
 
       # loss sampling settings.
+    
+      ### TIGER modified
+      #self.rpn_train_anchors_per_image = 300
       self.rpn_train_anchors_per_image = 32
       self.train_rois_per_image = 6 # per batch_instance
       self.roi_positive_ratio = 0.5
@@ -483,7 +494,13 @@ class Configs(DefaultConfigs):
       self.post_nms_rois_inference = 200 * (self.head_classes-1)
 
       # Final selection of detections (refine_detections)
-      self.model_max_instances_per_batch_element = 9 if self.dim == 2 else 18 # per batch element and class.
+      
+      ### TIGER - VERY IMPORTANT VALUE HERE... how best to pick this??? Should it be smaller in 2D and larger in 3D?
+      
+      self.model_max_instances_per_batch_element = 50 if self.dim == 2 else 200 # per batch element and class.
+      
+      
+      
       self.detection_nms_threshold = self.model_max_iou_resolution  # needs to be > 0, otherwise all predictions are one cluster.
       self.model_min_confidence = 0.2  # iou for nms in box refining (directly after heads), should be >0 since ths>=x in mrcnn.py
 

@@ -31,10 +31,11 @@ def plot_max(im, ax=0, plot=1):
 
 
 """ Tiger function """
-def boxes_to_mask(cf, results_dict, thresh):
+def boxes_to_mask(cf, results_dict, thresh, unique_id=0):
 
     label_arr = np.copy(results_dict['seg_preds'],)
     new_labels = np.zeros(np.shape(results_dict['seg_preds']))
+    class_labels = np.zeros(np.shape(results_dict['seg_preds']))
     for box_id, box_row in enumerate(results_dict['boxes'][0]):
         
         print('box_score: ' + str(box_row['box_score']))
@@ -60,6 +61,8 @@ def boxes_to_mask(cf, results_dict, thresh):
                 box_arr[label_arr == 0] = 0
                 
                 new_labels[box_arr > 0] = box_id + 1
+                
+                class_labels[box_arr > 0] = box_row['box_pred_class_id']
 
             else:
                 bc[0:4][np.where(bc[0:4] >= label_arr.shape[-2])[0]] = label_arr.shape[-2]
@@ -69,13 +72,15 @@ def boxes_to_mask(cf, results_dict, thresh):
                 box_arr[0, 0, bc[0]:bc[2], bc[1]:bc[3], bc[4]:bc[5],] = box_id + 1    ### +1 because starts from 0
                 box_arr[label_arr == 0] = 0
                 
-                new_labels[box_arr > 0] = box_id + 1           
+                new_labels[box_arr > 0] = box_id + 1
+                
+                class_labels[box_arr > 0] = box_row['box_pred_class_id']
 
                         
     label_arr = new_labels
     
     
-    return label_arr
+    return label_arr, class_labels
 
 
 
@@ -265,6 +270,8 @@ if __name__=="__main__":
             self.dataset_name = "datasets/toy"
             
             self.dataset_name = "datasets/OL_data"
+            
+            self.dataset_name = "datasets/Caspr_data"
             #self.exp_dir = "datasets/toy/experiments/mrcnnal2d_clkengal"  # detunet2d_di_bs16_ps512"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_retinau3d_cl_bs6"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_frcnn3d_cl_bs6"
@@ -277,6 +284,9 @@ if __name__=="__main__":
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/'
             
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/'
+            
+            
+            self.exp_dir = '/media/user/FantomHD/710_invivo_imaging/Caspr_tdT_homozygous/Caspr_training/Caspr_training_RegRCNN/'
 
             self.server_env = False
     args = Args()
@@ -338,7 +348,7 @@ if __name__=="__main__":
     
     
     """ Find last checkpoint """       
-    weight_path = onlyfiles_check[-3]   ### ONLY SOME CHECKPOINTS WORK FOR SOME REASON???
+    weight_path = onlyfiles_check[-1]   ### ONLY SOME CHECKPOINTS WORK FOR SOME REASON???
     
     """^^^ WHY DO ONLY SOME CHECKPOINTS WORK??? """
     
@@ -456,7 +466,7 @@ if __name__=="__main__":
                     results_2to3D['boxes'] = pred.apply_2d_3d_merging_to_patient(merge_dims_inputs)[0]
                     
 
-                    label_arr = boxes_to_mask(cf, results_dict=results_2to3D, thresh=cf.merge_3D_iou)
+                    label_arr, class_labels = boxes_to_mask(cf, results_dict=results_2to3D, thresh=cf.merge_3D_iou)
                     
                     
                     
@@ -519,24 +529,27 @@ if __name__=="__main__":
                                
                 else:
                     
-                    label_arr = boxes_to_mask(cf, results_dict=results_dict, thresh=cf.merge_3D_iou)
+                    label_arr, class_labels = boxes_to_mask(cf, results_dict=results_dict, thresh=cf.merge_3D_iou)
                     
                     if len(np.unique(label_arr)) == 1:
                         continue   ### no objects found (only 0 - background)
                                    
                     
                 
-                label_arr = np.asarray(label_arr, dtype=np.uint16)
+                class_labels = np.asarray(class_labels, dtype=np.uint16)
                     
-                label_arr = np.moveaxis(label_arr, -1, 1) 
+                class_labels = np.moveaxis(class_labels, -1, 1) 
         
-                tiff.imwrite(out_file + '_roi_masks_LABEL.tif', np.asarray(label_arr, dtype=np.uint16),
+                tiff.imwrite(out_file + '_roi_masks_LABEL.tif', np.asarray(class_labels, dtype=np.uint16),
                               imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})        
                 
                 ### This below hangs
                 
                 # plg.view_batch(cf, batch, res_dict=results_dict, show_info=False, legend=True, show_gt_labels=True,
                 #                           out_file=out_file, sample_picks=slices, has_colorchannels=False)
+                
+                
+                
                 if plot_boxes:
                     print('Plotting boxes png')
                     utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,

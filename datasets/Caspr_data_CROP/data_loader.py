@@ -156,23 +156,15 @@ class BatchGenerator(dutils.BatchGenerator):
 
             data = np.load(patient['data'], mmap_mode='r').astype('float16')[np.newaxis]
             
-            ### TIGER FIXING THIS -- WHY IS THIS UINT8????????????
+            ### HACK TIGER - if colorchannels, don't appent extra dimension at the beginning
+            if len(data.shape) == 5:
+                data = data[0]
             
-            #seg =  np.load(patient['seg'], mmap_mode='r').astype('uint8')
-            
-            seg =  np.load(patient['seg'], mmap_mode='r').astype('uint16')
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
+            seg =  np.load(patient['seg'], mmap_mode='r').astype('uint8')
+
+            # print(np.newaxis)
+            # print(data.shape)
+            # print(seg.shape)
 
             (c, y, x, z) = data.shape
             if self.cf.dim == 2:
@@ -286,21 +278,9 @@ class BatchGenerator(dutils.BatchGenerator):
                     if not np.any(seg):
                         assert non_zero==0
 
-
-        ### TIGER FIXING THIS -- WHY IS THIS UINT8????????????
-        
-
         batch = {'data': np.array(batch_data), 'seg': np.array(batch_segs).astype('uint8'),
-                  'pid': batch_pids,
-                  'roi_counts': batch_roi_counts, 'empty_counts': batch_empty_counts}
-        
-        
-        # batch = {'data': np.array(batch_data), 'seg': np.array(batch_segs).astype('uint16'),
-        #          'pid': batch_pids,
-        #          'roi_counts': batch_roi_counts, 'empty_counts': batch_empty_counts}
-        
-        
-        
+                 'pid': batch_pids,
+                 'roi_counts': batch_roi_counts, 'empty_counts': batch_empty_counts}
         for key,val in batch_roi_items.items(): #extend batch dic by entries of observables dic
             batch[key] = np.array(val)
 
@@ -343,17 +323,14 @@ class PatientBatchIterator(dutils.PatientBatchIterator):
         patient = self._data[pid]
 
         # already swapped dimensions in pp from (c,)z,y,x to c,y,x,z or h,w,d to ease 2D/3D-case handling
-        data = np.load(patient['data'], mmap_mode='r').astype('float16')[np.newaxis]    
+        data = np.load(patient['data'], mmap_mode='r').astype('float16')[np.newaxis]
         
-                    
-        ### TIGER FIXING THIS -- WHY IS THIS UINT8????????????
         
-        #seg =  np.load(patient[self.gt_prefix+'seg']).astype('uint8')[np.newaxis]
-         
-        seg =  np.load(patient[self.gt_prefix+'seg']).astype('uint16')[np.newaxis]
-         
-            
-        
+        ### HACK TIGER - if colorchannels, don't appent extra dimension at the beginning
+        if len(data.shape) == 5:
+            data = data[0]        
+    
+        seg =  np.load(patient[self.gt_prefix+'seg']).astype('uint8')[np.newaxis]
 
         data_shp_raw = data.shape
         plot_bg = data[self.cf.plot_bg_chan] if self.cf.plot_bg_chan not in self.chans else None

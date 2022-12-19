@@ -428,19 +428,23 @@ if __name__=="__main__":
     list_folder = []
     input_path = "./"
     
-    initial_dir = '/media/user/storage/Data/'
-    while(another_folder == 'y'):
-        input_path = filedialog.askdirectory(parent=root, initialdir= initial_dir,
-                                            title='Please select input directory')
-        input_path = input_path + '/'
+    # initial_dir = '/media/user/storage/Data/'
+    # while(another_folder == 'y'):
+    #     input_path = filedialog.askdirectory(parent=root, initialdir= initial_dir,
+    #                                         title='Please select input directory')
+    #     input_path = input_path + '/'
         
-        print('Do you want to select another folder? (y/n)')
-        another_folder = input();   # currently hangs forever
-        #another_folder = 'y';
+    #     print('Do you want to select another folder? (y/n)')
+    #     another_folder = input();   # currently hangs forever
+    #     #another_folder = 'y';
     
-        list_folder.append(input_path)
-        initial_dir = input_path    
+    #     list_folder.append(input_path)
+    #     initial_dir = input_path    
         
+
+    list_folder = ['/media/user/FantomHD/710_invivo_imaging/Caspr_tdT_homozygous/Caspr_RegRCNN_test_timeseries/']
+
+
 
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
@@ -500,7 +504,7 @@ if __name__=="__main__":
                 #                                           mean_arr=mean_arr, std_arr=std_arr, num_truth_class=num_truth_class,
                 #                                           skip_top=1)        
             
-                overlap_percent = 0
+                overlap_percent = 0.2
                 input_size = 128
                 depth = 32
                 num_truth_class = 2

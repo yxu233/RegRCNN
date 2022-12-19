@@ -36,7 +36,7 @@ class Configs(DefaultConfigs):
 
         self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy', "cyl1ps_dev")
         self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/MULTI', "cyl1ps_dev")
-        self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data', "")
+        self.pp_rootdir = os.path.join('/media/user/FantomHD/710_invivo_imaging/Caspr_tdT_homozygous/Caspr_training_CROP/Caspr_training_CROP_RegRCNN/Caspr_data', "")
         self.pp_npz_dir = self.pp_rootdir+"_npz"
 
         #self.pre_crop_size = [320,320,8] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
@@ -44,23 +44,21 @@ class Configs(DefaultConfigs):
         #self.pre_crop_size = [128,128,8] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
         
         
-        self.pre_crop_size = [128,128,16] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
-        
-        #self.pre_crop_size = [64,64,16] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
+        self.pre_crop_size = [128,128,32] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
         
         #self.pre_crop_size = [256,256,32] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
-        #self.min_2d_radius = 6 #in pixels
-        #self.n_train_samples, self.n_test_samples = 1200, 1000
+        self.min_2d_radius = 6 #in pixels
+        self.n_train_samples, self.n_test_samples = 1200, 1000
 
         # not actually real one-hot encoding (ohe) but contains more info: roi-overlap only within classes.
-        #self.pp_create_ohe_seg = False
+        self.pp_create_ohe_seg = False
         self.pp_empty_samples_ratio = 0.1
 
-        #self.pp_place_radii_mid_bin = True
-        #self.pp_only_distort_2d = True
+        self.pp_place_radii_mid_bin = True
+        self.pp_only_distort_2d = True
         # outer-most intensity of blurred radii, relative to inner-object intensity. <1 for decreasing, > 1 for increasing.
         # e.g.: setting 0.1 means blurred edge has min intensity 10% as large as inner-object intensity.
-        #self.pp_blur_min_intensity = 0.2
+        self.pp_blur_min_intensity = 0.2
 
         self.max_instances_per_sample = 1 #how many max instances over all classes per sample (img if 2d, vol if 3d)
         self.max_instances_per_class = self.max_instances_per_sample  # how many max instances per image per class
@@ -87,9 +85,24 @@ class Configs(DefaultConfigs):
 
         # shape choices: 'cylinder', 'block'
         #                        id,    name,       shape,      radius,                 color,              regression,     ambiguities,    gt_distortion
-        self.pp_classes = [Label(1,     'cylinder', 'cylinder', ((6,6,1),(40,40,8)),    (*self.blue, 1.),   "radius_2d",    (),             ()),
-                           #Label(2,      'block',      'block',        ((6,6,1),(40,40,8)),  (*self.aubergine,1.),  "radii_2d", (), ('radius_calib',))
+        # self.pp_classes = [Label(1,     'Caspr', 'rectangle', ('various'),    (*self.blue, 1.),   "radius_2d",    (),             ()),
+        #                    #Label(2,      'block',      'block',        ((6,6,1),(40,40,8)),  (*self.aubergine,1.),  "radii_2d", (), ('radius_calib',))
+        #     ]
+
+
+        ### FOR MULTI-CLASS task
+        #                        id,    name,       shape,      radius,                 color,              regression,     ambiguities,    gt_distortion
+        # self.pp_classes = [Label(1,     'Heminodes',     'rectangle', ('various'),  (*self.blue, 1.),      "radius_2d",    (),             ()),
+        #                    Label(2,      'Paired nodes', 'rectangle', ('various'),  (*self.aubergine,1.),  "radii_2d", (), ('radius_calib',)),
+        #                    #Label(3,      'Ectopic',      'rectangle', ('various'),  (*self.orange,1.),      "radii_2d", (), ('radius_calib',))
+        #     ]
+
+
+        self.pp_classes = [Label(1,     'Paired nodes',     'rectangle', ('various'),  (*self.blue, 1.),      "radius_2d",    (),             ()),
+                           #Label(2,      'Paired nodes', 'rectangle', ('various'),  (*self.aubergine,1.),  "radii_2d", (), ('radius_calib',)),
+                           #Label(3,      'Ectopic',      'rectangle', ('various'),  (*self.orange,1.),      "radii_2d", (), ('radius_calib',))
             ]
+
 
 
         #########################
@@ -98,7 +111,7 @@ class Configs(DefaultConfigs):
 
         #self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev'
 
-        self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger'
+        self.data_sourcedir = '/media/user/FantomHD/710_invivo_imaging/Caspr_tdT_homozygous/Caspr_training_CROP/Caspr_training_CROP_RegRCNN/Caspr_data'
 
         # if server_env:
         #     self.data_sourcedir = '/datasets/datasets_ramien/toy/data/cyl1ps_dev_npz'
@@ -133,7 +146,7 @@ class Configs(DefaultConfigs):
 
         self.start_filts = 48 if self.dim == 2 else 18
         self.end_filts = self.start_filts * 4 if self.dim == 2 else self.start_filts * 2
-        self.res_architecture = 'resnet50' # 'resnet101' , 'resnet50'  ### TIGER CHANGED TO 101
+        self.res_architecture = 'resnet101' # 'resnet101' , 'resnet50'  ### TIGER CHANGED TO 101
         self.norm = 'instance_norm' # one of None, 'instance_norm', 'batch_norm'
         self.relu = 'relu'
         # one of 'xavier_uniform', 'xavier_normal', or 'kaiming_normal', None (=default = 'kaiming_uniform')
@@ -154,7 +167,11 @@ class Configs(DefaultConfigs):
 
         self.n_cv_splits = 4
         # select modalities from preprocessed data
-        self.channels = [0]
+        
+        self.channels = [0, 1, 2]  ### TIGER - added this for color image with in_channels == 3
+        #self.channels = [0]
+        
+        
         self.n_channels = len(self.channels)
 
         # which channel (mod) to show as bg in plotting, will be extra added to batch if not in self.channels
@@ -230,7 +247,13 @@ class Configs(DefaultConfigs):
 
         self.plot_prediction_histograms = True
         self.plot_stat_curves = False
-        self.has_colorchannels = False
+        
+        
+        ### FOR COLOR DATA - TIGER
+        self.has_colorchannels = True
+        
+        
+        
         self.plot_class_ids = True
 
         self.num_classes = len(self.class_dict)
@@ -241,8 +264,8 @@ class Configs(DefaultConfigs):
         #########################
         
         
-        #self.do_aug = True
-        self.do_aug = False      ### TIGER - turned off data augmentation
+        self.do_aug = True
+        #self.do_aug = False      ### TIGER - turned off data augmentation
         
         
         
@@ -499,9 +522,7 @@ class Configs(DefaultConfigs):
       
       ### TIGER - VERY IMPORTANT VALUE HERE... how best to pick this??? Should it be smaller in 2D and larger in 3D?
       
-      self.model_max_instances_per_batch_element = 50 if self.dim == 2 else 200 # per batch element and class
-      
-      
+      self.model_max_instances_per_batch_element = 1 if self.dim == 2 else 1 # per batch element and class.
       
       
       

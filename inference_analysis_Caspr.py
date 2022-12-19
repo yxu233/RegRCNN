@@ -272,6 +272,8 @@ if __name__=="__main__":
             self.dataset_name = "datasets/OL_data"
             
             self.dataset_name = "datasets/Caspr_data"
+            
+            self.dataset_name = "datasets/Caspr_data_CROP"
             #self.exp_dir = "datasets/toy/experiments/mrcnnal2d_clkengal"  # detunet2d_di_bs16_ps512"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_retinau3d_cl_bs6"
             #self.exp_dir = "/home/gregor/networkdrives/E132-Cluster-Projects/prostate/experiments/gs6071_frcnn3d_cl_bs6"
@@ -287,6 +289,9 @@ if __name__=="__main__":
             
             
             self.exp_dir = '/media/user/FantomHD/710_invivo_imaging/Caspr_tdT_homozygous/Caspr_training/Caspr_training_RegRCNN/'
+            
+            
+            self.exp_dir = '/media/user/FantomHD/710_invivo_imaging/Caspr_tdT_homozygous/Caspr_training_CROP/Caspr_training_CROP_RegRCNN/'
 
             self.server_env = False
     args = Args()

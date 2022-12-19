@@ -37,8 +37,7 @@ def boxes_to_mask(cf, results_dict, thresh):
     new_labels = np.zeros(np.shape(results_dict['seg_preds']))
     for box_id, box_row in enumerate(results_dict['boxes'][0]):
         
-        print('box_score: ' + str(box_row['box_score']))
-        
+ 
         
         #if cf.dim == 2 and box_row['box_score'] < cf.merge_3D_iou:
         #    continue
@@ -70,6 +69,10 @@ def boxes_to_mask(cf, results_dict, thresh):
                 box_arr[label_arr == 0] = 0
                 
                 new_labels[box_arr > 0] = box_id + 1           
+
+        else:
+            print('box_score: ' + str(box_row['box_score']))
+            
 
                         
     label_arr = new_labels
@@ -277,6 +280,7 @@ if __name__=="__main__":
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/'
             
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/'
+            #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/8) 2D_128x128x32 retina_unet/'
 
             self.server_env = False
     args = Args()
@@ -395,7 +399,9 @@ if __name__=="__main__":
     num_to_plot = 50
     plot_boxes = 0
     
-    thresh_2D_to_3D_boxes = 0.5
+
+    # thresh = cf.merge_3D_iou
+    # cf.merge_3D_iou = 1
     
     for id_f in range(0, len(pids)):
         
@@ -454,9 +460,9 @@ if __name__=="__main__":
                     results_2to3D['2D_boxes'] = results_dict['boxes']
                     merge_dims_inputs = [results_dict['boxes'], 'dummy_pid', cf.class_dict, cf.merge_3D_iou]
                     results_2to3D['boxes'] = pred.apply_2d_3d_merging_to_patient(merge_dims_inputs)[0]
-                    
+                    results_dict['boxes'] = results_2to3D['boxes'] 
 
-                    label_arr = boxes_to_mask(cf, results_dict=results_2to3D, thresh=cf.merge_3D_iou)
+                    label_arr = boxes_to_mask(cf, results_dict=results_dict, thresh=cf.merge_3D_iou)
                     
                     
                     

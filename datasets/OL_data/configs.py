@@ -54,7 +54,7 @@ class Configs(DefaultConfigs):
 
         # not actually real one-hot encoding (ohe) but contains more info: roi-overlap only within classes.
         #self.pp_create_ohe_seg = False
-        self.pp_empty_samples_ratio = 0.1
+        #self.pp_empty_samples_ratio = 0.1
 
         #self.pp_place_radii_mid_bin = True
         #self.pp_only_distort_2d = True
@@ -133,7 +133,7 @@ class Configs(DefaultConfigs):
 
         self.start_filts = 48 if self.dim == 2 else 18
         self.end_filts = self.start_filts * 4 if self.dim == 2 else self.start_filts * 2
-        self.res_architecture = 'resnet50' # 'resnet101' , 'resnet50'  ### TIGER CHANGED TO 101
+        self.res_architecture = 'resnet101' # 'resnet101' , 'resnet50'  ### TIGER CHANGED TO 101
         self.norm = 'instance_norm' # one of None, 'instance_norm', 'batch_norm'
         self.relu = 'relu'
         # one of 'xavier_uniform', 'xavier_normal', or 'kaiming_normal', None (=default = 'kaiming_uniform')
@@ -148,9 +148,13 @@ class Configs(DefaultConfigs):
 
         ##self.num_epochs = 24
         
-        self.num_epochs = 80
+        self.num_epochs = 100
         self.num_train_batches = 100 if self.dim == 2 else 180
-        self.batch_size = 20 if self.dim == 2 else 8
+        #self.batch_size = 20 if self.dim == 2 else 8
+        
+        #self.batch_size = 20 if self.dim == 2 else 4
+        
+        self.batch_size = 20 if self.dim == 2 else 2
 
         self.n_cv_splits = 4
         # select modalities from preprocessed data
@@ -251,13 +255,13 @@ class Configs(DefaultConfigs):
             'mirror': True,
             'mirror_axes': tuple(np.arange(0, self.dim, 1)),
             'do_elastic_deform': False,
-            'alpha': (500., 1500.),
-            'sigma': (40., 45.),
-            'do_rotation': False,
+            'alpha': (0., 1500.),
+            'sigma': (30., 50.),
+            'do_rotation': True,   ### Tiger changed to True
             'angle_x': (0., 2 * np.pi),
             'angle_y': (0., 0),
             'angle_z': (0., 0),
-            'do_scale': False,
+            'do_scale': True,   ### Tiger changed to True
             'scale': (0.8, 1.1),
             'random_crop': False,
             'rand_crop_dist': (self.patch_size[0] / 2. - 3, self.patch_size[1] / 2. - 3),
@@ -326,12 +330,26 @@ class Configs(DefaultConfigs):
         self.ap_match_ious = [0.5]  # threshold(s) for considering a prediction as true positive
         self.min_det_thresh = 0.3
 
-        self.model_max_iou_resolution = 0.2
+        #self.model_max_iou_resolution = 0.2
+
+        
+        ### TIGER changed thresholds
+        self.min_det_thresh = 0.3
+
+        self.model_max_iou_resolution = 0.05
+
+
+
+
 
         # aggregation method for test and val_patient predictions.
         # wbc = weighted box clustering as in https://arxiv.org/pdf/1811.08661.pdf,
         # nms = standard non-maximum suppression, or None = no clustering
-        self.clustering = 'wbc'
+        #self.clustering = 'wbc'
+        
+        self.clustering = 'nms'
+        
+        
         # iou thresh (exclusive!) for regarding two preds as concerning the same ROI
         self.clustering_iou = self.model_max_iou_resolution  # has to be larger than desired possible overlap iou of model predictions
 
@@ -443,23 +461,45 @@ class Configs(DefaultConfigs):
       # anchor scales are chosen according to expected object sizes in data set. Default uses only one anchor scale
       # per pyramid level. (outer list are pyramid levels (corresponding to BACKBONE_STRIDES), inner list are scales per level.)
       self.rpn_anchor_scales = {'xy': [[4], [8], [16], [32]], 'z': [[1], [2], [4], [8]]}
+      
+      #self.rpn_anchor_scales = {'xy': [[6], [12], [25], [50]], 'z': [[1.5], [3], [6], [12.5]]}   ### TIGER added
+      
+      
       # choose which pyramid levels to extract features from: P2: 0, P3: 1, P4: 2, P5: 3.
       self.pyramid_levels = [0, 1, 2, 3]
       # number of feature maps in rpn. typically lowered in 3D to save gpu-memory.
-      self.n_rpn_features = 512 if self.dim == 2 else 64
+      
+      
+      ### TIGER increased
+      #self.n_rpn_features = 512 if self.dim == 2 else 64
+      self.n_rpn_features = 512 if self.dim == 2 else 128
+      
 
       # anchor ratios and strides per position in feature maps.
       self.rpn_anchor_ratios = [0.5, 1., 2.]
       self.rpn_anchor_stride = 1
+      
+      
+      
+      
+      
       # Threshold for first stage (RPN) non-maximum suppression (NMS):  LOWER == HARDER SELECTION
+      #self.rpn_nms_threshold = max(0.7, self.model_max_iou_resolution)
+      
+      ### Tiger changed to make more anchors:
       self.rpn_nms_threshold = max(0.7, self.model_max_iou_resolution)
+      
 
       # loss sampling settings.
     
       ### TIGER modified
-      #self.rpn_train_anchors_per_image = 300
-      self.rpn_train_anchors_per_image = 32
-      self.train_rois_per_image = 6 # per batch_instance
+      self.rpn_train_anchors_per_image = 8000  ### TIGER
+      self.train_rois_per_image = 8000 # per batch_instance
+      
+      
+      
+      #self.rpn_train_anchors_per_image = 32
+      #self.train_rois_per_image = 6 # per batch_instance
       self.roi_positive_ratio = 0.5
       self.anchor_matching_iou = 0.8
 
@@ -487,23 +527,35 @@ class Configs(DefaultConfigs):
       self.n_plot_rpn_props = 5 if self.dim == 2 else 30  # per batch_instance (slice in 2D / patient in 3D)
 
       # pre-selection in proposal-layer (stage 1) for NMS-speedup. applied per batch element.
-      self.pre_nms_limit = 2000 if self.dim == 2 else 4000
+      #self.pre_nms_limit = 2000 if self.dim == 2 else 4000
+      
+      ### TIGER 
+      self.pre_nms_limit = 3000 if self.dim == 2 else 8000
 
       # n_proposals to be selected after NMS per batch element. too high numbers blow up memory if "detect_while_training" is True,
       # since proposals of the entire batch are forwarded through second stage as one "batch".
-      self.roi_chunk_size = 1300 if self.dim == 2 else 500
-      self.post_nms_rois_training = 200 * (self.head_classes-1) if self.dim == 2 else 400
-      self.post_nms_rois_inference = 200 * (self.head_classes-1)
+      #self.roi_chunk_size = 1300 if self.dim == 2 else 500
+      
+      ### TIGER 
+      self.roi_chunk_size = 2500 if self.dim == 2 else 600
+
+      
+      ### TIGER CHANGED
+      #self.post_nms_rois_training = 200 * (self.head_classes-1) if self.dim == 2 else 400
+      #self.post_nms_rois_inference = 200 * (self.head_classes-1)
+
+
+      self.post_nms_rois_training = 800 * (self.head_classes-1) if self.dim == 2 else 600   # best 500
+      self.post_nms_rois_inference = 800 * (self.head_classes-1)  if self.dim == 2 else 2000  # best 2000    ### 8000 is too high
+
+
 
       # Final selection of detections (refine_detections)
       
       ### TIGER - VERY IMPORTANT VALUE HERE... how best to pick this??? Should it be smaller in 2D and larger in 3D?
       
-      self.model_max_instances_per_batch_element = 50 if self.dim == 2 else 200 # per batch element and class
-      
-      
-      
-      
+      self.model_max_instances_per_batch_element = 50 if self.dim == 2 else 800 # per batch element and class
+
       
       self.detection_nms_threshold = self.model_max_iou_resolution  # needs to be > 0, otherwise all predictions are one cluster.
       self.model_min_confidence = 0.2  # iou for nms in box refining (directly after heads), should be >0 since ths>=x in mrcnn.py
@@ -520,19 +572,44 @@ class Configs(DefaultConfigs):
             int(np.ceil(self.patch_size[2] / stride_z))]
            for stride, stride_z in zip(self.backbone_strides['xy'], self.backbone_strides['z']
                                        )])
+                
+                
+      ### TIGER - moved from retina_net exclusive to here
+        
+      # implement extra anchor-scales according to https://arxiv.org/abs/1708.02002
+      #self.focal_loss = False
+      # self.rpn_anchor_scales['xy'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
+      #                                   self.rpn_anchor_scales['xy']]
+      # self.rpn_anchor_scales['z'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
+      #                                  self.rpn_anchor_scales['z']]
+      #self.n_anchors_per_pos = len(self.rpn_anchor_ratios) * 3
+        
+      # pre-selection of detections for NMS-speedup. per entire batch.
+      #self.pre_nms_limit = (500 if self.dim == 2 else 6250) * self.batch_size
+            
+            
+                
+                
+                
+                
 
       if self.model == 'retina_net' or self.model == 'retina_unet':
         # whether to use focal loss or SHEM for loss-sample selection
-        self.focal_loss = False
+        
         # implement extra anchor-scales according to https://arxiv.org/abs/1708.02002
         self.rpn_anchor_scales['xy'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
                                         self.rpn_anchor_scales['xy']]
         self.rpn_anchor_scales['z'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
-                                       self.rpn_anchor_scales['z']]
+                                        self.rpn_anchor_scales['z']]
         self.n_anchors_per_pos = len(self.rpn_anchor_ratios) * 3
 
         # pre-selection of detections for NMS-speedup. per entire batch.
-        self.pre_nms_limit = (500 if self.dim == 2 else 6250) * self.batch_size
+        #self.pre_nms_limit = (500 if self.dim == 2 else 6250) * self.batch_size
+        
+        
+        ### Tiger changed
+        self.pre_nms_limit = (500 if self.dim == 2 else 500) * self.batch_size
+        
 
         # anchor matching iou is lower than in Mask R-CNN according to https://arxiv.org/abs/1708.02002
         self.anchor_matching_iou = 0.7

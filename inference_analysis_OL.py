@@ -279,7 +279,7 @@ if __name__=="__main__":
             
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/'
             
-            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/'
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/22) 3D mrcnn post_nms_600_2000/'
             #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/8) 2D_128x128x32 retina_unet/'
 
             self.server_env = False
@@ -400,8 +400,8 @@ if __name__=="__main__":
     plot_boxes = 0
     
 
-    # thresh = cf.merge_3D_iou
-    # cf.merge_3D_iou = 1
+    thresh = 0.99
+    cf.merge_3D_iou = thresh
     
     for id_f in range(0, len(pids)):
         

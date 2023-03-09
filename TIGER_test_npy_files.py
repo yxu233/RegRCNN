@@ -77,8 +77,8 @@ import numpy as np
 
 
 
-a = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/1.npy')
-b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/1_seg.npy')
+a = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/41.npy')
+b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/41_seg.npy')
 
 
 import napari

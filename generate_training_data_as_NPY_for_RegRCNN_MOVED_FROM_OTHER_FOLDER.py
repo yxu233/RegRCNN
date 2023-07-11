@@ -164,7 +164,7 @@ list_folder = ['/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Tr
 """ Loop through all the folders and do the analysis!!!"""
 for input_path in list_folder:
     foldername = input_path.split('/')[-2]
-    sav_dir = input_path + '/' + foldername + '_RegRCNN'
+    sav_dir = input_path + '/' + foldername + '_RegRCNN_TEST'
  
     """ Load filenames from tiff """
     images = glob.glob(os.path.join(input_path,'*.tif'))    # can switch this to "*truth.tif" if there is no name for "input"
@@ -233,6 +233,8 @@ for input_path in list_folder:
     info_dict_train = []
     info_dict_test  = []
     all_num_objs = []
+    
+    bbox_stats = []
     for i in range(0, len(images), 2):
             #if total_samples > 500:
             #    break
@@ -487,17 +489,27 @@ for input_path in list_folder:
                 
                         cc = measure.regionprops(labels)
                         radii = []
+                        
+                        
                         for cell in cc:
                             radii.append(np.asarray(float(cell['equivalent_diameter'])))
                             
+                            bbox = cell['bbox']
+                        
+                            bbox_depth = bbox[3] - bbox[0]
+                            bbox_width = bbox[4] - bbox[1]
+                            bbox_height = bbox[5] - bbox[2]
                             
+                            #print(bbox)
+                            bbox_stats.append([bbox_depth, bbox_width, bbox_height])
+                            
+                        
                         
 
                         quad_truth_nib = np.moveaxis(labels, 0, -1)
                         #quad_truth_nib = nib.Nifti1Image(quad_truth_nib, affine=np.eye(4))
                         
-                        
-                
+      
                         
                         if rand_int == 10:
                             #np.save(sav_dir_imagesTs + filename + str(int(x)) + '_' + str(int(y)) + '_' + str(int(z)) + '_' + str(total_samples) + "_seg.npy", quad_truth_nib)
@@ -628,6 +640,40 @@ info_df_test.to_pickle(sav_dir_imagesTs + 'info_df.pickle')
 
 # info_df_ts = pd.DataFrame(info_dict_ts)
 # info_df_ts.to_pickle(sav_dir_imagesTs + 'info_df.pickle')
+
+
+
+bbox_stats = np.vstack(bbox_stats)
+
+plt.figure(); plt.hist(bbox_stats[:, 0])
+plt.figure(); plt.hist(bbox_stats[:, 1])
+plt.figure(); plt.hist(bbox_stats[:, 2])
+
+
+
+
+#plt.figure(); plt.scatter(bbox_stats[:, 1], bbox_stats[:, 2])
+
+
+
+import numpy as np
+import numpy.random
+import matplotlib.pyplot as plt
+
+# Generate some test data
+x = np.random.randn(8873)
+y = np.random.randn(8873)
+
+heatmap, xedges, yedges = np.histogram2d(bbox_stats[:, 1], bbox_stats[:, 2], bins=50)
+extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+
+
+plt.figure()
+plt.clf()
+plt.imshow(heatmap.T, extent=extent, origin='lower')
+plt.show()
+
+
 
 
 

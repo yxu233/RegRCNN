@@ -185,48 +185,113 @@ class Mask(nn.Module):
         return x
 
 
+
+
+############################################################
+#  Loss Functions NEW
+############################################################
+
+
+def compute_rpn_class_loss(rpn_class_logits, rpn_match, shem_poolsize):
+    """RPN anchor classifier loss.
+
+    rpn_match: [batch, anchors, 1]. Anchor match type. 1=positive,
+                -1=negative, 0=neutral anchor.
+    rpn_class_logits: [batch, anchors, 2]. RPN classifier logits for FG/BG.
+    """
+
+    # Squeeze last dim to simplify
+    #rpn_match = rpn_match.squeeze(2)
+
+    # Get anchor classes. Convert the -1/+1 match to 0/1 values.
+    anchor_class = (rpn_match == 1).long()
+
+    # Positive and Negative anchors contribute to the loss,
+    # but neutral anchors (match value = 0) don't.
+    indices = torch.nonzero(rpn_match != 0)
+    
+    
+    ### TIGER ADDED
+    neg_indices = torch.nonzero(rpn_match == -1)
+    np_neg_ix = neg_indices.cpu().data.numpy()
+
+    # Pick rows that contribute to the loss and filter out the rest.
+    # rpn_class_logits = rpn_class_logits[indices.data[:,0],indices.data[:,1],:]
+    # anchor_class = anchor_class[indices.data[:,0],indices.data[:,1]]
+    
+    
+    # TIGER -- RegRCNN loops over batch, so dimension 1 is not there
+    # Pick rows that contribute to the loss and filter out the rest.
+    rpn_class_logits = rpn_class_logits[indices.data[:,0],:]
+    anchor_class = anchor_class[indices.data[:,0]]
+
+    # Crossentropy loss
+    loss = F.cross_entropy(rpn_class_logits, anchor_class)
+
+    return loss, np_neg_ix
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ############################################################
 #  Loss Functions
 ############################################################
 
-def compute_rpn_class_loss(rpn_class_logits, rpn_match, shem_poolsize):
-    """
-    :param rpn_match: (n_anchors). [-1, 0, 1] for negative, neutral, and positive matched anchors.
-    :param rpn_class_logits: (n_anchors, 2). logits from RPN classifier.
-    :param SHEM_poolsize: int. factor of top-k candidates to draw from per negative sample (stochastic-hard-example-mining).
-    :return: loss: torch tensor
-    :return: np_neg_ix: 1D array containing indices of the neg_roi_logits, which have been sampled for training.
-    """
+# def compute_rpn_class_loss(rpn_class_logits, rpn_match, shem_poolsize):
+#     """
+#     :param rpn_match: (n_anchors). [-1, 0, 1] for negative, neutral, and positive matched anchors.
+#     :param rpn_class_logits: (n_anchors, 2). logits from RPN classifier.
+#     :param SHEM_poolsize: int. factor of top-k candidates to draw from per negative sample (stochastic-hard-example-mining).
+#     :return: loss: torch tensor
+#     :return: np_neg_ix: 1D array containing indices of the neg_roi_logits, which have been sampled for training.
+#     """
 
-    # Filter out netural anchors
-    pos_indices = torch.nonzero(rpn_match == 1)
-    neg_indices = torch.nonzero(rpn_match == -1)
+#     # Filter out netural anchors
+#     pos_indices = torch.nonzero(rpn_match == 1)
+#     neg_indices = torch.nonzero(rpn_match == -1)
 
-    # loss for positive samples
-    if not 0 in pos_indices.size():
-        pos_indices = pos_indices.squeeze(1)
-        roi_logits_pos = rpn_class_logits[pos_indices]
-        pos_loss = F.cross_entropy(roi_logits_pos, torch.LongTensor([1] * pos_indices.shape[0]).cuda())
-    else:
-        pos_loss = torch.FloatTensor([0]).cuda()
+#     # loss for positive samples
+#     if not 0 in pos_indices.size():
+#         pos_indices = pos_indices.squeeze(1)
+#         roi_logits_pos = rpn_class_logits[pos_indices]
+#         pos_loss = F.cross_entropy(roi_logits_pos, torch.LongTensor([1] * pos_indices.shape[0]).cuda())
+#     else:
+#         pos_loss = torch.FloatTensor([0]).cuda()
 
-    # loss for negative samples: draw hard negative examples (SHEM)
-    # that match the number of positive samples, but at least 1.
-    if not 0 in neg_indices.size():
-        neg_indices = neg_indices.squeeze(1)
-        roi_logits_neg = rpn_class_logits[neg_indices]
-        negative_count = np.max((1, pos_indices.cpu().data.numpy().size))
-        roi_probs_neg = F.softmax(roi_logits_neg, dim=1)
-        neg_ix = mutils.shem(roi_probs_neg, negative_count, shem_poolsize)
-        neg_loss = F.cross_entropy(roi_logits_neg[neg_ix], torch.LongTensor([0] * neg_ix.shape[0]).cuda())
-        np_neg_ix = neg_ix.cpu().data.numpy()
-        #print("pos, neg count", pos_indices.cpu().data.numpy().size, negative_count)
-    else:
-        neg_loss = torch.FloatTensor([0]).cuda()
-        np_neg_ix = np.array([]).astype('int32')
+#     # loss for negative samples: draw hard negative examples (SHEM)
+#     # that match the number of positive samples, but at least 1.
+#     if not 0 in neg_indices.size():
+#         neg_indices = neg_indices.squeeze(1)
+#         roi_logits_neg = rpn_class_logits[neg_indices]
+#         negative_count = np.max((1, pos_indices.cpu().data.numpy().size))
+#         roi_probs_neg = F.softmax(roi_logits_neg, dim=1)
+#         neg_ix = mutils.shem(roi_probs_neg, negative_count, shem_poolsize)
+#         neg_loss = F.cross_entropy(roi_logits_neg[neg_ix], torch.LongTensor([0] * neg_ix.shape[0]).cuda())
+#         np_neg_ix = neg_ix.cpu().data.numpy()
+#         #print("pos, neg count", pos_indices.cpu().data.numpy().size, negative_count)
+#     else:
+#         neg_loss = torch.FloatTensor([0]).cuda()
+#         np_neg_ix = np.array([]).astype('int32')
 
-    loss = (pos_loss + neg_loss) / 2
-    return loss, np_neg_ix
+
+#     # print('class rpn losses')
+#     # print(pos_loss)
+#     # print(neg_loss)
+#     loss = (pos_loss + neg_loss) / 2
+#     return loss, np_neg_ix
 
 
 def compute_rpn_bbox_loss(rpn_pred_deltas, rpn_target_deltas, rpn_match):
@@ -248,6 +313,9 @@ def compute_rpn_bbox_loss(rpn_pred_deltas, rpn_target_deltas, rpn_match):
         loss = F.smooth_l1_loss(rpn_pred_deltas, target_deltas)
     else:
         loss = torch.FloatTensor([0]).cuda()
+        
+        # TIGER added
+        loss.requires_grad = True
 
     return loss
 
@@ -266,6 +334,9 @@ def compute_mrcnn_bbox_loss(mrcnn_pred_deltas, mrcnn_target_deltas, target_class
         loss = F.smooth_l1_loss(pred_bbox, target_bbox)
     else:
         loss = torch.FloatTensor([0]).cuda()
+        
+        # TIGER added
+        loss.requires_grad = True
 
     return loss
 
@@ -286,7 +357,10 @@ def compute_mrcnn_mask_loss(pred_masks, target_masks, target_class_ids):
         y_pred = pred_masks[positive_ix, positive_class_ids, :, :]
         loss = F.binary_cross_entropy(y_pred, y_true)
     else:
-        loss = torch.FloatTensor([0]).cuda()
+        loss = torch.Tensor([0]).cuda()
+        
+        # TIGER added        
+        loss.requires_grad = True
 
     return loss
 
@@ -300,6 +374,9 @@ def compute_mrcnn_class_loss(tasks, pred_class_logits, target_class_ids):
         loss = F.cross_entropy(pred_class_logits, target_class_ids.long())
     else:
         loss = torch.FloatTensor([0.]).cuda()
+        
+        # TIGER added       
+        loss.requires_grad = True
 
     return loss
 
@@ -322,6 +399,9 @@ def compute_mrcnn_regression_loss(tasks, pred, target, target_class_ids):
             #loss = F.mse_loss(pred, target)
     else:
         loss = torch.FloatTensor([0.]).cuda()
+        
+        # TIGER added
+        loss.requires_grad = True
 
     return loss
 
@@ -392,7 +472,7 @@ class net(nn.Module):
         # build Anchors, FPN, RPN, Classifier / Bbox-Regressor -head, Mask-head
         self.np_anchors = mutils.generate_pyramid_anchors(self.logger, self.cf)
         self.anchors = torch.from_numpy(self.np_anchors).float().cuda()
-        self.fpn = backbone.FPN(self.cf, conv, relu_enc=self.cf.relu, operate_stride1=False).cuda()
+        self.fpn = backbone.FPN(self.cf, conv, relu_enc=self.cf.relu, operate_stride1=self.cf.operate_stride1).cuda()
         self.rpn = RPN(self.cf, conv)
         self.classifier = Classifier(self.cf, conv)
         self.mask = Mask(self.cf, conv)
@@ -683,9 +763,11 @@ class net(nn.Module):
             # add negative anchors used for loss to output list for monitoring.
             # neg_anchor_ix = neg_ix come from shem and mark positions in roi_probs_neg = rpn_class_logits[neg_indices]
             # with neg_indices = rpn_match == -1
-            neg_anchors = mutils.clip_boxes_numpy(self.np_anchors[rpn_match == -1][neg_anchor_ix], img.shape[2:])
-            for n in neg_anchors:
-                box_results_list[b].append({'box_coords': n, 'box_type': 'neg_anchor'})
+            
+            ### TIGER - removed
+            # neg_anchors = mutils.clip_boxes_numpy(self.np_anchors[rpn_match == -1][neg_anchor_ix], img.shape[2:])
+            # for n in neg_anchors:
+            #     box_results_list[b].append({'box_coords': n, 'box_type': 'neg_anchor'})
 
             # add highest scoring proposals to output list for monitoring.
             rpn_proposals = proposal_boxes[b][proposal_boxes[b, :, -1].argsort()][::-1]
@@ -711,7 +793,17 @@ class net(nn.Module):
             mrcnn_mask_loss = compute_mrcnn_mask_loss(mrcnn_pred_mask, target_mask, target_class_ids)
 
         loss = batch_rpn_class_loss + batch_rpn_bbox_loss +\
-               mrcnn_bbox_loss + mrcnn_mask_loss +  mrcnn_class_loss + mrcnn_regressions_loss
+              mrcnn_bbox_loss + mrcnn_mask_loss +  mrcnn_class_loss + mrcnn_regressions_loss
+
+
+        ### TIGER - removed class losses
+        # loss = batch_rpn_bbox_loss +\
+        #        mrcnn_bbox_loss + mrcnn_mask_loss + mrcnn_regressions_loss
+
+
+
+
+
 
         # run unmolding of predictions for monitoring and merge all results to one dictionary.
         return_masks = self.cf.return_masks_in_val if is_validation else self.cf.return_masks_in_train

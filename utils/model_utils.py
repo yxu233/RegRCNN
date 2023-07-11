@@ -966,6 +966,28 @@ def generate_anchors_3D(scales_xy, scales_z, ratios, shape, feature_stride_xy, f
     widths = scales_xy * np.sqrt(ratios_meshed)
     depths = np.tile(np.array(scales_z), len(ratios_meshed)//np.array(scales_z)[..., None].shape[0])
 
+
+
+    """ FOR NEW MODELS """
+    
+    #depths = scales_z * np.sqrt(ratios_meshed)   ### generate depths
+    
+
+    ### TIGER added    
+    # ratio_depth = ratios[:int(len(ratios)/2)]   ### get half of ratios in ascending order
+    # ratio_depth_reverse = np.flip(ratio_depth)  ### get other half of ratios in descending order
+    # ratio_depth_reverse[int(len(ratio_depth_reverse)/2)] = 1.5 ### set middle ratio to be diff value, otherwise, it repeats
+    # all_ratios_depth = np.concatenate((ratio_depth, ratio_depth_reverse), axis=0)  ### concatenate everything together
+
+    # depths = scales_z * np.sqrt(all_ratios_depth)   ### generate depths
+    
+    # print(depths)
+    
+    
+    
+    """ """
+
+
     # Enumerate shifts in feature space
     shifts_y = np.arange(0, shape[0], anchor_stride) * feature_stride_xy #translate from fm positions to input coords.
     shifts_x = np.arange(0, shape[1], anchor_stride) * feature_stride_xy

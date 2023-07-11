@@ -375,6 +375,9 @@ class BatchGenerator(SlimDataLoaderBase):
         """
         # oversampling of fg: limit bg weights to anything <= fg weights by setting factor < 1 to overweight fg.
         bg_weight_factor = 0.1
+        
+        ### TIGER hack:
+        #bg_weight_factor = 0
 
         self.unique_ts = np.unique([v for pat in self.targets.values() for v in pat])
         self.sample_stats = pd.DataFrame(columns=[str(ix)+suffix for ix in self.unique_ts for suffix in ["", "_bg"]], index=list(self.targets.keys()))
@@ -384,6 +387,8 @@ class BatchGenerator(SlimDataLoaderBase):
                 self.sample_stats.loc[pid, str(targ)] = int(fg_count > 0)
                 self.sample_stats.loc[pid, str(targ)+"_bg"] = int(fg_count == 0)
 
+
+        ### TIGER - this gets statistics of the data, so that it can be balanced
         self.targ_stats = self.sample_stats.agg(
             ("sum", lambda col: col.sum() / len(self._data)), axis=0, sort=False).rename({"<lambda>": "relative"})
 
@@ -393,6 +398,15 @@ class BatchGenerator(SlimDataLoaderBase):
         self.fg_bg_weights /= cum_weights
         mask = ["_bg" in ix for ix in self.fg_bg_weights.index]
         self.fg_bg_weights.loc[mask] = self.fg_bg_weights.loc[mask].apply(lambda x: x * bg_weight_factor)
+
+
+
+
+        ### TIGER HACK:
+        # self.fg_bg_weights['1'] = 1
+        # self.fg_bg_weights['1_bg'] = 1
+
+
 
         self.p_probs = self.sample_stats.apply(self.sample_targets_to_weights, args=(self.fg_bg_weights,), axis=1).sum(axis=1)
         self.p_probs = self.p_probs / self.p_probs.sum()

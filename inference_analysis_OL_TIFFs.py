@@ -31,15 +31,13 @@ def plot_max(im, ax=0, plot=1):
 
 
 """ Tiger function """
-def boxes_to_mask(cf, results_dict, thresh, unique_id=0):
+def boxes_to_mask(cf, results_dict, thresh):
 
     label_arr = np.copy(results_dict['seg_preds'],)
     new_labels = np.zeros(np.shape(results_dict['seg_preds']))
-    class_labels = np.zeros(np.shape(results_dict['seg_preds']))
     for box_id, box_row in enumerate(results_dict['boxes'][0]):
         
-        print('box_score: ' + str(box_row['box_score']))
-        
+ 
         
         #if cf.dim == 2 and box_row['box_score'] < cf.merge_3D_iou:
         #    continue
@@ -61,8 +59,6 @@ def boxes_to_mask(cf, results_dict, thresh, unique_id=0):
                 box_arr[label_arr == 0] = 0
                 
                 new_labels[box_arr > 0] = box_id + 1
-                
-                class_labels[box_arr > 0] = box_row['box_pred_class_id']
 
             else:
                 bc[0:4][np.where(bc[0:4] >= label_arr.shape[-2])[0]] = label_arr.shape[-2]
@@ -72,15 +68,17 @@ def boxes_to_mask(cf, results_dict, thresh, unique_id=0):
                 box_arr[0, 0, bc[0]:bc[2], bc[1]:bc[3], bc[4]:bc[5],] = box_id + 1    ### +1 because starts from 0
                 box_arr[label_arr == 0] = 0
                 
-                new_labels[box_arr > 0] = box_id + 1
-                
-                class_labels[box_arr > 0] = box_row['box_pred_class_id']
+                new_labels[box_arr > 0] = box_id + 1           
+
+        else:
+            print('box_score: ' + str(box_row['box_score']))
+            
 
                         
     label_arr = new_labels
     
     
-    return label_arr, class_labels
+    return label_arr
 
 
 
@@ -292,15 +290,40 @@ if __name__=="__main__":
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/22) 3D mrcnn post_nms_600_2000/'
             
             
+            
+            
+            
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/24) 3D mrcnn increased pre_nms_rois_and_other_stuff_BEST/'
 
             
-            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/26) same as 24 but Resnet100/'
+             
+            #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/26) same as 24 but Resnet100/'
+            
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/34) MaskRCNN_2D_restored_scales_no_ratios_wbc_BEST/'
                         
             
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/40) maskrcnn_like24_but_with_adjusted_depth_box_sizes/'
+                
                  
-
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/44) long_training_better/'
+                
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/51) ADAM_resnet101_wbc_no_weird_Z_bbox_ratios_got_better/'
+            
+            
             self.server_env = False
+            
+            
+            
+            
+    mask = 0
+            
+            
+            
+            
+            
     args = Args()
 
 
@@ -457,12 +480,12 @@ if __name__=="__main__":
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
         foldername = input_path.split('/')[-2]
-        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_26)'
+        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_51)'
     
         """ For testing ILASTIK images """
         images = glob.glob(os.path.join(input_path,'*.tif'))    # can switch this to "*truth.tif" if there is no name for "input"
         images.sort(key=natsort_keygen(alg=ns.REAL))  # natural sorting
-        examples = [dict(input=i,truth=i.replace('.tif','_truth.tif'), ilastik=i.replace('.tif','_single_Object Predictions_.tiff')) for i in images]
+        examples = [dict(input=i,truth=i.replace('.tif','_truth.tif'), mask=i.replace('.tif','_MASK.tif')) for i in images]
     
 
          
@@ -497,8 +520,11 @@ if __name__=="__main__":
                 input_im = tiff.imread(input_name)
                 
                 
-
-                
+               
+                if mask:
+                    mask_im = tiff.imread(examples[i]['mask'])
+                    input_im[mask_im > 0] = 0
+                    
        
                 """ Analyze each block with offset in all directions """
                 
@@ -573,12 +599,29 @@ if __name__=="__main__":
                                quad_intensity = np.expand_dims(quad_intensity, axis=0)
                                quad_intensity = np.asarray(quad_intensity, dtype=np.float16)
                                
-                               batch = {'data':quad_intensity, 'seg': np.zeros([1, 1, input_size, input_size, depth]), 
-                                        'class_targets': np.asarray([]), 'bb_targets': np.asarray([]), 
-                                        'roi_masks': np.zeros([1, 1, 1, input_size, input_size, depth]),
-                                        'patient_bb_target': np.asarray([]), 'original_img_shape': quad_intensity.shape,
-                                        'patient_class_targets': np.asarray([]), 'pid': ['0']}
                                
+                               
+                               if cf.dim == 3:
+                               
+                                   batch = {'data':quad_intensity, 'seg': np.zeros([1, 1, input_size, input_size, depth]), 
+                                            'class_targets': np.asarray([]), 'bb_targets': np.asarray([]), 
+                                            'roi_masks': np.zeros([1, 1, 1, input_size, input_size, depth]),
+                                            'patient_bb_target': np.asarray([]), 'original_img_shape': quad_intensity.shape,
+                                            'patient_class_targets': np.asarray([]), 'pid': ['0']}
+                                   
+                                   
+                               else:
+                                   
+                                   quad_intensity = quad_intensity[0]
+                                   quad_intensity = np.moveaxis(quad_intensity, -1, 0)
+                                   
+                                   batch = {'data':quad_intensity, 'seg': np.zeros([depth, 1, input_size, input_size]), 
+                                            'class_targets': np.asarray([]), 'bb_targets': np.asarray([]), 
+                                            'roi_masks': np.zeros([depth, input_size, input_size]),
+                                            'patient_bb_target': np.asarray([]), 'original_img_shape': quad_intensity.shape,
+                                            'patient_class_targets': np.asarray([]), 'pid': ['0']}
+                                                                      
+                                   
                                
                                 # class_targets': array([], shape=(1, 0), dtype=float64),
                                 # 'bb_target': array([], shape=(1, 0), dtype=float64),
@@ -594,7 +637,8 @@ if __name__=="__main__":
                                 #  'original_img_shape': (1, 3, 128, 128, 32),
                                 #  'patient_class_targets': array([], shape=(1, 0), dtype=float64),
                                 #  'pid': array(['0'], dtype='<U1')}
-
+                                
+                                
 
 
                                results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
@@ -619,9 +663,12 @@ if __name__=="__main__":
                                if cf.dim == 2:
                                     #input_im = np.expand_dims(batch['data'], axis=0)
                                     truth_im = np.expand_dims(batch['seg'], axis=0)
-                                    seg_im = np.expand_dims(results_dict['seg_preds'], axis=0)
+                                    #seg_im = np.expand_dims(results_dict['seg_preds'], axis=0)
                                     
                                     
+                                    seg_im = results_dict['seg_preds'][:, 0,...]
+                                    
+
                                     """ roi_mask means we dont need bounding boxes!!! 
                                     
                                             - if there are NO objects in this image, then will have a weird shape, so need to parse it by len()
@@ -641,15 +688,41 @@ if __name__=="__main__":
                                         results_2to3D['2D_boxes'] = results_dict['boxes']
                                         merge_dims_inputs = [results_dict['boxes'], 'dummy_pid', cf.class_dict, cf.merge_3D_iou]
                                         results_2to3D['boxes'] = pred.apply_2d_3d_merging_to_patient(merge_dims_inputs)[0]
+                                        results_dict['boxes'] = results_2to3D['boxes'] 
                                         
                     
-                                        label_arr, class_labels = boxes_to_mask(cf, results_dict=results_2to3D, thresh=cf.merge_3D_iou)
+                                        label_arr = boxes_to_mask(cf, results_dict=results_dict, thresh=cf.merge_3D_iou)
+                            
                                         
+                            
+                            
+                                    else:                  
+                                                        
+                                        """ THIS CODE IS WRONG --- roi_masks is the INPUT, not the output of MaskRCNN, have to use bounding boxes """
+                                        # label_arr = np.zeros(np.shape(batch['data']))
+                                        # for slice_id, slice_masks in enumerate(batch['roi_masks']):
+                                        #     for obj_id, obj_mask in enumerate(slice_masks):
+                                        #         label_arr[slice_id][obj_mask > 0] = obj_id + 1   ### +1 because starts at index 0 (background)
+                                         
+                                    
+                                    label_arr = np.asarray(label_arr, dtype=np.uint16)
                                         
-                                    class_labels = np.asarray(class_labels, dtype=np.uint16)
+                                    label_arr = np.expand_dims(label_arr, axis=0)
+                            
+                                    # tiff.imwrite(out_file + '_roi_masks_LABEL.tif', np.asarray(label_arr, dtype=np.uint16),
+                                    #               imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})        
+                                    
+                                    # ### This below hangs
+                                    
+                                    # # plg.view_batch(cf, batch, res_dict=results_dict, show_info=False, legend=True, show_gt_labels=True,
+                                    # #                           out_file=out_file, sample_picks=slices, has_colorchannels=False)
+                                    # if plot_boxes:
+                                    #     print('Plotting boxes png')
+                                    #     utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,
+                                    #                             show_gt_labels=True, get_time="val-example plot",
+                                    #                             out_file=os.path.join(cf.plot_dir, 'batch_SINGLE_PID_{}.png'.format(pid)))
                                         
-                                    class_labels = np.expand_dims(class_labels, axis=0)
-
+                                
 
                                elif cf.dim == 3:
                                     
@@ -669,7 +742,7 @@ if __name__=="__main__":
                                         continue   ### no objects found (only 0 - background) 
                                     else:
                                         
-                                        label_arr, class_labels = boxes_to_mask(cf, results_dict=results_dict, thresh=cf.merge_3D_iou)
+                                        label_arr = boxes_to_mask(cf, results_dict=results_dict, thresh=cf.merge_3D_iou)
                                         
                                         if len(np.unique(label_arr)) == 1:
                                             continue   ### no objects found (only 0 - background)      
@@ -687,6 +760,7 @@ if __name__=="__main__":
 
 
                                cleaned_seg = np.asarray(label_arr, dtype=np.uint8)
+                              
                                cleaned_seg = cleaned_seg[0, :, 0, :, :]
                             
                             

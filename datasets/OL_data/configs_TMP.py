@@ -108,9 +108,6 @@ class Configs(DefaultConfigs):
                 - normalization?
                 - somehow get more anchors... need to reduce backbone stride? - but crashing currently
                 - retinaUNet with reduced anchors?
-                
-                
-                larger background stride?
             
             
             """
@@ -155,7 +152,7 @@ class Configs(DefaultConfigs):
 
         self.start_filts = 48 if self.dim == 2 else 18
         self.end_filts = self.start_filts * 4 if self.dim == 2 else self.start_filts * 2
-        self.res_architecture = 'resnet101' # 'resnet101' , 'resnet50'  ### TIGER CHANGED TO 101
+        self.res_architecture = 'resnet50' # 'resnet101' , 'resnet50'  ### TIGER CHANGED TO 101
         self.norm = 'instance_norm' # one of None, 'instance_norm', 'batch_norm'
         self.relu = 'relu'
         # one of 'xavier_uniform', 'xavier_normal', or 'kaiming_normal', None (=default = 'kaiming_uniform')
@@ -170,13 +167,13 @@ class Configs(DefaultConfigs):
 
         ##self.num_epochs = 24
         
-        self.num_epochs = 100000
+        self.num_epochs = 100
         self.num_train_batches = 100 if self.dim == 2 else 180
         #self.batch_size = 20 if self.dim == 2 else 8
         
         #self.batch_size = 20 if self.dim == 2 else 4
         
-        self.batch_size = 10 if self.dim == 2 else 2
+        self.batch_size = 20 if self.dim == 2 else 2
 
         self.n_cv_splits = 4
         # select modalities from preprocessed data
@@ -200,13 +197,6 @@ class Configs(DefaultConfigs):
         # ratio of free sampled batch elements before class balancing is triggered
         # (>0 to include "empty"/background patches.)
         self.batch_random_ratio = 0.2
-        
-        
-        ### TIGER - changed this
-        #self.batch_random_ratio = 1.0
-        
-        
-        
         self.balance_target = "class_targets" if 'class' in self.prediction_tasks else "rg_bin_targets"
 
         self.observables_patient = []
@@ -329,17 +319,7 @@ class Configs(DefaultConfigs):
 
         self.lr_decay_factor = 0.25
         self.scheduling_patience = np.ceil(3600 / (self.num_train_batches * self.batch_size))
-        #self.weight_decay = 3e-5
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+        self.weight_decay = 3e-5
         self.exclude_from_wd = []
         self.clip_norm = None  # number or None
 
@@ -369,13 +349,13 @@ class Configs(DefaultConfigs):
         self.ap_match_ious = [0.5]  # threshold(s) for considering a prediction as true positive
         self.min_det_thresh = 0.3
 
-        self.model_max_iou_resolution = 0.2
+        #self.model_max_iou_resolution = 0.2
 
         
         ### TIGER changed thresholds
         self.min_det_thresh = 0.3
 
-        #self.model_max_iou_resolution = 0.1
+        self.model_max_iou_resolution = 0.2
 
 
 
@@ -384,9 +364,9 @@ class Configs(DefaultConfigs):
         # aggregation method for test and val_patient predictions.
         # wbc = weighted box clustering as in https://arxiv.org/pdf/1811.08661.pdf,
         # nms = standard non-maximum suppression, or None = no clustering
-        self.clustering = 'wbc'
+        #self.clustering = 'wbc'
         
-        #self.clustering = 'nms'
+        self.clustering = 'nms'
         
         
         # iou thresh (exclusive!) for regarding two preds as concerning the same ROI
@@ -470,49 +450,20 @@ class Configs(DefaultConfigs):
 
         
       ### TIGER:
-        
+      #self.learning_rate = [3e-5] * self.num_epochs
+      #self.dynamic_lr_scheduling = False  # with scheduler set in exec  
                   ### ^^^need more than 100 epochs for this!!!
 
-      self.optimizer = 'ADAMW'
-
-
-      if self.optimizer == 'ADAMW':
-          self.weight_decay = 3e-5
-         # self.learning_rate = [3e-4] * self.num_epochs
-          
-          # For retinaUNet
-          self.learning_rate = [3e-4] * self.num_epochs
-          
-          
-          #self.learning_rate = [1e-5] * self.num_epochs
-          self.dynamic_lr_scheduling = False  # with scheduler set in exec
-          
-          # self.learning_rate = [3e-4] * self.num_epochs
-          # self.dynamic_lr_scheduling = True  # with scheduler set in exec
-          # self.scheduling_criterion = max(self.model_selection_criteria, key=self.model_selection_criteria.get)
-          # self.scheduling_mode = 'min' if "loss" in self.scheduling_criterion else 'max'
-              
-              
-      elif self.optimizer == 'SGD':
-          self.weight_decay = 0.000   ### detectron used 0.0, maskrcnn paper used 0.0001
-          self.momentum = 0.9
-          self.learning_rate = [0.002] * self.num_epochs   ### detectron used 0.001, maskrcnn paper used 0.02
-          
-          
-          self.dynamic_lr_scheduling = False  # with scheduler set in exec
-              
-
-
-
+      self.learning_rate = [3e-4] * self.num_epochs
+      self.dynamic_lr_scheduling = True  # with scheduler set in exec
+      self.scheduling_criterion = max(self.model_selection_criteria, key=self.model_selection_criteria.get)
+      self.scheduling_mode = 'min' if "loss" in self.scheduling_criterion else 'max'
 
       # number of classes for network heads: n_foreground_classes + 1 (background)
       self.head_classes = self.num_classes + 1 if 'class' in self.prediction_tasks else 2
 
       # feed +/- n neighbouring slices into channel dimension. set to None for no context.
       self.n_3D_context = None
-      
-      
-      
       if self.n_3D_context is not None and self.dim == 2:
         self.n_channels *= (self.n_3D_context * 2 + 1)
 
@@ -535,7 +486,7 @@ class Configs(DefaultConfigs):
       #%% Tiger testing
       
       
-      #self.operate_stride1 = False   # if True adds high-res decoder levels to feature pyramid: P1 + P0. (e.g. set to true in retina_unet configs)
+      self.operate_stride1 = False   # if True adds high-res decoder levels to feature pyramid: P1 + P0. (e.g. set to true in retina_unet configs)
       
       
       
@@ -559,79 +510,16 @@ class Configs(DefaultConfigs):
       #self.backbone_strides = {'xy': [4, 8, 16, 16], 'z': [1, 2, 4, 8]}
 
       
-      #self.rpn_anchor_scales = {'xy': [[5], [10], [15], [25]], 'z': [[2], [5], [8], [12]]}
+      #self.rpn_anchor_scales = {'xy': [[2], [4], [8], [16]], 'z': [[1], [2], [4], [8]]}
             
       
-      #self.rpn_anchor_scales = {'xy': [[4, 4, 4, 4], [8, 8, 8, 8], [16, 16, 16, 16], [32, 32, 32, 32]], 'z': [[1, 1, 1,1], [2, 2, 2, 2], [4, 4, 4, 4], [8, 8, 8, 8]]}
+      #self.rpn_anchor_scales = {'xy': [[2, 2, 2], [8, 8, 8], [16, 16, 16], [32, 32, 32]], 'z': [[1, 1, 1], [2, 2, 2], [4, 4, 4], [8, 8, 8]]}
               
               
       
       
       
-      """ Tiger's notes:
-          
-              fpn first generates features (through convolution) which are essentially just convolved images
-              
-              then the rpn strides across the features to place a certain number of anchors as determined by:
-                      a) anchor scale (which is literally x, y pixel size of anchor --- but is it multiplied? or actual?)
-                      b) anchor ratio (which is just allows us to have rectangular and square anchors)
-                      c) backbone stride --> which I think is pre-determined based off of the pre-existing architecture backbone??? Double check with RetinaUNet
-                                ---> since this is pre-determined, you can't make more filters, just change the size of the filters per level with the "rpn_scale"
-                                
-                                
-                    ***Caveat: with Retina_UNet --> somehow it can take 3 rpn_anchor_scales per level (or maybe even more?) which means it can
-                                generate a ton more filters... wish we could do this with maskrcnn somehow...
-          
-                    ***can add more filters by adding more ratio... but not sure if this will actually help...
-          
-          
-              Things to try:
-                  - train Retina UNet
-                  - alter mask shape
-                  - train 2D model with context
-                  
-                  - single learning rate throughout
-          
-          
-          
-              SETUP 2D inference
-              
-              figure out how scaling works exactly... maybe want smaller numbers overall???
-              
-              
-              
-          
-            
-          ***CHANGE MASK SIZE??? maybe why the segmentations are small?
-          
-          
-          
-          check on training data
-              - error message at beginning of training???
-          
-            
-          
-             Training params:
-                 - SGD?
-                 - slower learning rate?
-                 
-                 
-                 
-                 
-            From Jeremias:
-                - remove class loss?
-                - remove SHEM? or any class-based balancing?
-                - remove class loss --> and then also reduce # of post-nms selections???
-                
-                - reduce epsilon
-                 
-                 
-                
-            07/10/23 - Tiger removed empty samples and SHEM (re-did rpn_class_loss function)
-                 
-                 
-          
-          """
+      
       
       
       
@@ -650,32 +538,12 @@ class Configs(DefaultConfigs):
       
       ### TIGER increased
       #self.n_rpn_features = 512 if self.dim == 2 else 64
-      self.n_rpn_features = 512 if self.dim == 2 else 512
+      self.n_rpn_features = 512 if self.dim == 2 else 1024
       
 
       # anchor ratios and strides per position in feature maps.
       self.rpn_anchor_ratios = [0.5, 1., 2.]
       self.rpn_anchor_stride = 1
-      
-      
-      
-      # ### TIGER added:
-      # if self.model == 'retina_unet':
-      #       self.rpn_anchor_ratios = [0.5, 1., 2.]
-
-      # else:          
-      #       self.rpn_anchor_ratios = [0.5, 0.75, 1., 1.5, 2.]
-            
-            
-      #       self.rpn_anchor_ratios = [0.5, 1., 2.]
-      
-      
-      
-      ### for multi-depth resolution
-      #self.rpn_anchor_ratios = [0.25, 0.5, 1., 2., 3.,  3., 2., 1., 0.5, 0.25]
-      
-      
-      ### Try lots more ratios next!!! especially bigger than expected!!!
       
       
       
@@ -695,60 +563,27 @@ class Configs(DefaultConfigs):
       self.train_rois_per_image = 8000 # per batch_instance
       
       
-      # self.rpn_train_anchors_per_image = 800  ### TIGER
-      # self.train_rois_per_image = 800 # per batch_instance
       
-      
-      
-      #self.rpn_train_anchors_per_image = 64
+      #self.rpn_train_anchors_per_image = 32
       #self.train_rois_per_image = 6 # per batch_instance
-      #self.roi_positive_ratio = 0.5
+      self.roi_positive_ratio = 0.5
       self.anchor_matching_iou = 0.8
-
-
-        
-        # Number of ROIs per image to feed to classifier/mask heads
-         # The Mask RCNN paper uses 512 but often the RPN doesn't generate
-         # enough positive proposals to fill this and keep a positive:negative
-         # ratio of 1:3. You can increase the number of proposals by adjusting
-         # the RPN NMS threshold.
-         #TRAIN_ROIS_PER_IMAGE = 200
-         # Percent of positive ROIs used to train classifier/mask heads
-         #ROI_POSITIVE_RATIO = 0.33
-      self.roi_positive_ratio = 0.2
 
       # k negative example candidates are drawn from a pool of size k*shem_poolsize (stochastic hard-example mining),
       # where k<=#positive examples.
-      #self.shem_poolsize = 6
-      
-      ### TIGER - 
       self.shem_poolsize = 6
-      
 
-      ### TIGER - 
       self.pool_size = (7, 7) if self.dim == 2 else (7, 7, 3)
       self.mask_pool_size = (14, 14) if self.dim == 2 else (14, 14, 5)
       self.mask_shape = (28, 28) if self.dim == 2 else (28, 28, 10)
-
-
-
-      ### TIGER EDITS  
-      # self.pool_size = (7, 7) if self.dim == 2 else (7, 7, 5)
-      # self.mask_pool_size = (14, 14) if self.dim == 2 else (14, 14, 8)
-      # self.mask_shape = (28, 28) if self.dim == 2 else (28, 28, 16)
-
-
-
-
-
 
       self.rpn_bbox_std_dev = np.array([0.1, 0.1, 0.1, 0.2, 0.2, 0.2])
       self.bbox_std_dev = np.array([0.1, 0.1, 0.1, 0.2, 0.2, 0.2])
       
       
       ### TIGER
-      # self.rpn_bbox_std_dev = np.array([0.1, 0.1, 0.1, 0.4, 0.4, 0.4])
-      # self.bbox_std_dev = np.array([0.1, 0.1, 0.1, 0.4, 0.4, 0.4])
+      # self.rpn_bbox_std_dev = np.array([0.05, 0.05, 0.05, 0.05, 0.05, 0.05])
+      # self.bbox_std_dev = np.array([0.05, 0.05, 0.05, 0.05, 0.05, 0.05])
       
       
       
@@ -777,7 +612,7 @@ class Configs(DefaultConfigs):
       #self.roi_chunk_size = 1300 if self.dim == 2 else 500
       
       ### TIGER 
-      self.roi_chunk_size = 2500 if self.dim == 2 else 8000
+      self.roi_chunk_size = 2500 if self.dim == 2 else 600
       
       
       ### TIGER CHANGED MORE - 062223
@@ -789,34 +624,20 @@ class Configs(DefaultConfigs):
       #self.post_nms_rois_inference = 200 * (self.head_classes-1)
 
 
-      # self.post_nms_rois_training = 800 * (self.head_classes-1) if self.dim == 2 else 600   # best 500
-      # self.post_nms_rois_inference = 800 * (self.head_classes-1)  if self.dim == 2 else 2000  # best 2000    ### 8000 is too high
+      self.post_nms_rois_training = 800 * (self.head_classes-1) if self.dim == 2 else 600   # best 500
+      self.post_nms_rois_inference = 800 * (self.head_classes-1)  if self.dim == 2 else 2000  # best 2000    ### 8000 is too high
 
-
-
-
-      self.post_nms_rois_training = 800 * (self.head_classes-1) if self.dim == 2 else 800   # best 500
-      self.post_nms_rois_inference = 800 * (self.head_classes-1)  if self.dim == 2 else 800  # best 2000    ### 8000 is too high
-
-    
 
 
       # Final selection of detections (refine_detections)
       
       ### TIGER - VERY IMPORTANT VALUE HERE... how best to pick this??? Should it be smaller in 2D and larger in 3D?
       
-      self.model_max_instances_per_batch_element = 100 if self.dim == 2 else 800 # per batch element and class
+      self.model_max_instances_per_batch_element = 50 if self.dim == 2 else 800 # per batch element and class
 
       
       self.detection_nms_threshold = self.model_max_iou_resolution  # needs to be > 0, otherwise all predictions are one cluster.
       self.model_min_confidence = 0.2  # iou for nms in box refining (directly after heads), should be >0 since ths>=x in mrcnn.py
-      
-      ### FROM REGRCNN   
-      #self.detection_nms_threshold = 1e-5  # needs to be > 0, otherwise all predictions are one cluster.
-      # self.model_min_confidence = 0.1
-
-
-
 
       if self.dim == 2:
         self.backbone_shapes = np.array(
@@ -874,15 +695,15 @@ class Configs(DefaultConfigs):
         # whether to use focal loss or SHEM for loss-sample selection
         
         #implement extra anchor-scales according to https://arxiv.org/abs/1708.02002
-        self.rpn_anchor_scales['xy'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
-                                        self.rpn_anchor_scales['xy']]
-        self.rpn_anchor_scales['z'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
-                                        self.rpn_anchor_scales['z']]
+        #self.rpn_anchor_scales['xy'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
+        #                                self.rpn_anchor_scales['xy']]
+        #self.rpn_anchor_scales['z'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
+        #                                self.rpn_anchor_scales['z']]
         
         
         
         ### TIGER - swapped out for less anchor scales overall...
-        #self.rpn_anchor_scales = {'xy': [[4, 6, 8], [8, 9, 10], [16, 18, 20], [32, 34, 36]], 'z': [[1, 1.5, 1.8], [2, 2.5, 3], [4, 4.5, 6], [8, 10, 12]]}
+        self.rpn_anchor_scales = {'xy': [[2, 2, 2], [8, 8, 8], [16, 16, 16], [32, 32, 32]], 'z': [[1, 1, 1], [2, 2, 2], [4, 4, 4], [8, 8, 8]]}
               
         
         

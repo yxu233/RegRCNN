@@ -281,6 +281,19 @@ if __name__=="__main__":
             
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/22) 3D mrcnn post_nms_600_2000/'
             #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/8) 2D_128x128x32 retina_unet/'
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/24) 3D mrcnn increased pre_nms_rois_and_other_stuff_BEST/'
+            #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/34) MaskRCNN_2D_restored_scales_no_ratios_wbc_BEST/'
+
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/44) long_training_better/'
+
+
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/62) SHEM_removed_new_rpn_class_loss_BEST/'
+
+
+
+
+
 
             self.server_env = False
     args = Args()
@@ -329,7 +342,7 @@ if __name__=="__main__":
 
     """ TO LOAD OLD CHECKPOINT """
     # Read in file names
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     print(device)
 
     from natsort import natsort_keygen, ns
@@ -441,6 +454,19 @@ if __name__=="__main__":
 
 
                 
+                ### plot concatenated TIFF
+                truth_im[truth_im > 0] = 65535
+                seg_im[seg_im > 0] = 65535
+                concat  = np.concatenate((input_im, np.asarray(truth_im, dtype=np.uint16), np.asarray(seg_im, dtype=np.uint16)))
+
+                concat = np.moveaxis(concat, 0, 2)       
+                concat = np.moveaxis(concat, 0, 1)                         
+
+
+                tiff.imwrite(out_file + '_COMPOSITE.tif', concat,
+                              imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+
+                
                 """ roi_mask means we dont need bounding boxes!!! 
                 
                         - if there are NO objects in this image, then will have a weird shape, so need to parse it by len()
@@ -510,6 +536,18 @@ if __name__=="__main__":
                               imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
                             
                 tiff.imwrite(out_file + '_seg.tif', np.asarray(seg_im, dtype=np.uint8),
+                              imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+
+                ### plot concatenated TIFF
+                truth_im[truth_im > 0] = 65535
+                seg_im[seg_im > 0] = 65535
+                concat  = np.concatenate((input_im, np.asarray(truth_im, dtype=np.uint16), np.asarray(seg_im, dtype=np.uint16)))
+
+                concat = np.moveaxis(concat, 0, 2)       
+                concat = np.moveaxis(concat, 0, 1)                         
+
+
+                tiff.imwrite(out_file + '_COMPOSITE.tif', concat,
                               imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
 
 

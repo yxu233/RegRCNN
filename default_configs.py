@@ -115,7 +115,7 @@ class DefaultConfigs:
 
         self.prediction_tasks = ["class"]  # 'class', 'regression_class', 'regression_kendall', 'regression_feindt'
 
-        self.weight_decay = 0.0
+        #self.weight_decay = 0.0
 
         # nonlinearity to be applied after convs with nonlinearity. one of 'relu' or 'leaky_relu'
         self.relu = 'relu'
@@ -125,12 +125,21 @@ class DefaultConfigs:
 
         # if True adds high-res decoder levels to feature pyramid: P1 + P0. (e.g. set to true in retina_unet configs)
         self.operate_stride1 = False
+        
+        
+        ### TIGER CHANGED THIS:
+        #self.operate_stride1 = True 
+            
 
         #########################
         #  Optimization         #
         #########################
 
-        self.optimizer = "ADAMW" # "ADAMW" or "SGD" or implemented additionals
+        #self.optimizer = "ADAMW" # "ADAMW" or "SGD" or implemented additionals
+        
+        
+        #self.optimizer = "SGD" # "ADAMW" or "SGD" or implemented additionals
+        
 
         #########################
         #  Schedule             #

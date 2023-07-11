@@ -81,9 +81,9 @@ a = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Train
 b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/41_seg.npy')
 
 
-import napari
-viewer = napari.view_image(a)
-viewer.add_image(b)
+# import napari
+# viewer = napari.view_image(a)
+# viewer.add_image(b)
 
 import _pickle as cPickle
 

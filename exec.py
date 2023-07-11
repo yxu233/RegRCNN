@@ -58,12 +58,18 @@ def train(cf, logger):
         
     
     if cf.optimizer == "ADAMW":
+        
+        ### TIGER - adamw default settings:
+        #torch.optim.AdamW(params, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01, amsgrad=False, *, maximize=False, foreach=None, capturable=False, differentiable=False, fused=None)
+        
         optimizer = torch.optim.AdamW(utils.parse_params_for_optim(net, weight_decay=cf.weight_decay,
-                                                                   exclude_from_wd=cf.exclude_from_wd),
+                                                                   exclude_from_wd=cf.exclude_from_wd,
+                                                                   ), 
+                                      ### TIGER added: eps=1e-01,
                                       lr=cf.learning_rate[0])
     elif cf.optimizer == "SGD":
         optimizer = torch.optim.SGD(utils.parse_params_for_optim(net, weight_decay=cf.weight_decay),
-                                    lr=cf.learning_rate[0], momentum=0.3)
+                                    lr=cf.learning_rate[0], momentum=cf.momentum)
     if cf.dynamic_lr_scheduling:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=cf.scheduling_mode, factor=cf.lr_decay_factor,
                                                                patience=cf.scheduling_patience)
@@ -97,6 +103,13 @@ def train(cf, logger):
             logger.time("train_batch_loadfw")
             batch = next(batch_gen['train'])
             
+            
+            ### TIGER - if fully empty, skip
+            if batch['empty_counts'] > 0:
+                continue
+            
+            
+            
             ### SEND THIS BATCH TO DEVICE 1???
             
             
@@ -109,7 +122,56 @@ def train(cf, logger):
             logger.time("train_batch_netfw")
             logger.time("train_batch_bw")
             optimizer.zero_grad()
+            
+            print(results_dict['torch_loss'])
+            
             results_dict['torch_loss'].backward()
+            
+            # if i == 88:  ### this is an empty batch (46 is single empty)
+            #     continue
+            
+            ## SAVE BATCH DATA IF LOSS == 0!!!
+            # import numpy as np
+            # import tifffile as tiff
+            # out_file = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/output_batch/'
+            # loss_int = results_dict['torch_loss'].item() 
+            # if loss_int > 1:
+                
+            #     print('___________________________________________________________________________________________________')
+            #     input_im = np.moveaxis(batch['data'], -1, 1) 
+            #     truth_im = np.moveaxis(batch['seg'], -1, 1) 
+            #     seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
+                
+            #     for id_z in range(cf.batch_size):
+                    
+            #         inp = np.expand_dims(input_im[id_z], 0)
+            #         truth = np.expand_dims(truth_im[id_z], 0)
+            #         seg = np.expand_dims(seg_im[id_z], 0)
+                    
+    
+            #         ### plot concatenated TIFF
+            #         truth[truth > 0] = 65535
+            #         seg[seg > 0] = 65535
+            #         concat  = np.concatenate((inp, np.asarray(truth, dtype=np.uint16), np.asarray(seg, dtype=np.uint16)))
+    
+            #         concat = np.moveaxis(concat, 0, 2)       
+            #         concat = np.moveaxis(concat, 0, 1)                         
+    
+    
+            #         tiff.imwrite(out_file + 'epoch_' + str(epoch) + '_iter_' + str(i) + '_batch_' +  str(id_z) + '_loss_' + str(round(loss_int, 2)) + '_COMPOSITE.tif', concat,
+            #                       imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+    
+    
+            #         max_im = np.amax(inp, axis=1)[0][0]
+            #         max_im[max_im > 2000] = 2000
+            #         max_im = np.asarray((max_im/2000) * 255, dtype=np.uint8)
+    
+            #         tiff.imwrite(out_file + 'MAX_epoch_' + str(epoch) + '_iter_' + str(i) + '_batch_' +  str(id_z) + '_loss_' + str(round(loss_int, 2))+ '_COMPOSITE.tif', max_im)
+    
+
+                
+  
+            
             if cf.clip_norm:
                 torch.nn.utils.clip_grad_norm_(net.parameters(), cf.clip_norm, norm_type=2) # gradient clipping
             optimizer.step()

@@ -27,6 +27,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils
+from torch.autograd import Variable
 
 import utils.model_utils as mutils
 import utils.exp_utils as utils
@@ -188,7 +189,11 @@ class Mask(nn.Module):
 
 
 ############################################################
-#  Loss Functions NEW
+#  Loss Functions 
+
+        ### Positive anchors == foreground, Negative anchors == background
+
+
 ############################################################
 
 
@@ -294,6 +299,51 @@ def compute_rpn_class_loss(rpn_class_logits, rpn_match, shem_poolsize):
 #     return loss, np_neg_ix
 
 
+
+# def compute_rpn_bbox_loss(rpn_bbox, target_bbox, rpn_match):
+#     """Return the RPN bounding box loss graph.
+
+#     target_bbox: [max positive anchors, (dy, dx, log(dh), log(dw))].
+#         Uses 0 padding to fill in unsed bbox deltas.
+#     rpn_match: [anchors, 1]. Anchor match type. 1=positive,
+#                -1=negative, 0=neutral anchor.
+#     rpn_bbox: [anchors, (dy, dx, log(dh), log(dw))]
+#     """
+    
+    
+#     """ TIGER NOTES:
+        
+#             size of target_bbox is determined by "rpn_train_anchors_per_image" in configs.py!!!
+            
+#             ***also note, "trim target" below does nothing because there are more rpn_bbox than there are target_bbox (in this instance)
+        
+#         """
+    
+    
+
+#     # Squeeze last dim to simplify
+#     #rpn_match = rpn_match.squeeze(2)
+
+#     # Positive anchors contribute to the loss, but negative and
+#     # neutral anchors (match value of 0 or -1) don't.
+#     indices = torch.nonzero(rpn_match==1)
+
+#     # Pick bbox deltas that contribute to the loss
+#     rpn_bbox = rpn_bbox[indices.data[:,0],]
+
+#     # Trim target bounding box deltas to the same length as rpn_bbox.
+#     target_bbox = target_bbox[:rpn_bbox.size()[0],:]
+
+#     # Smooth L1 loss
+#     loss = F.smooth_l1_loss(rpn_bbox, target_bbox)
+
+#     return loss
+
+
+
+
+
+
 def compute_rpn_bbox_loss(rpn_pred_deltas, rpn_target_deltas, rpn_match):
     """
     :param rpn_target_deltas:   (b, n_positive_anchors, (dy, dx, (dz), log(dh), log(dw), (log(dd)))).
@@ -319,6 +369,39 @@ def compute_rpn_bbox_loss(rpn_pred_deltas, rpn_target_deltas, rpn_match):
 
     return loss
 
+
+
+
+# def compute_mrcnn_bbox_loss(pred_bbox, target_bbox, target_class_ids):
+#     """Loss for Mask R-CNN bounding box refinement.
+
+#     target_bbox: [batch, num_rois, (dy, dx, log(dh), log(dw))]
+#     target_class_ids: [batch, num_rois]. Integer class IDs.
+#     pred_bbox: [batch, num_rois, num_classes, (dy, dx, log(dh), log(dw))]
+#     """
+
+#     if target_class_ids.size():
+#         # Only positive ROIs contribute to the loss. And only
+#         # the right class_id of each ROI. Get their indicies.
+#         positive_roi_ix = torch.nonzero(target_class_ids > 0)[:, 0]
+#         positive_roi_class_ids = target_class_ids[positive_roi_ix.data].long()
+#         indices = torch.stack((positive_roi_ix,positive_roi_class_ids), dim=1)
+
+#         # Gather the deltas (predicted and true) that contribute to loss
+#         target_bbox = target_bbox[indices[:,0].data,:]
+#         pred_bbox = pred_bbox[indices[:,0].data,indices[:,1].data,:]
+
+#         # Smooth L1 loss
+#         loss = F.smooth_l1_loss(pred_bbox, target_bbox)
+#     else:
+#         loss = Variable(torch.FloatTensor([0]), requires_grad=False)
+#         if target_class_ids.is_cuda:
+#             loss = loss.cuda()
+
+#     return loss
+
+
+
 def compute_mrcnn_bbox_loss(mrcnn_pred_deltas, mrcnn_target_deltas, target_class_ids):
     """
     :param mrcnn_target_deltas: (n_sampled_rois, (dy, dx, (dz), log(dh), log(dw), (log(dh)))
@@ -329,6 +412,9 @@ def compute_mrcnn_bbox_loss(mrcnn_pred_deltas, mrcnn_target_deltas, target_class
     if not 0 in torch.nonzero(target_class_ids > 0).size():
         positive_roi_ix = torch.nonzero(target_class_ids > 0)[:, 0]
         positive_roi_class_ids = target_class_ids[positive_roi_ix].long()
+        
+        
+        
         target_bbox = mrcnn_target_deltas[positive_roi_ix, :].detach()
         pred_bbox = mrcnn_pred_deltas[positive_roi_ix, positive_roi_class_ids, :]
         loss = F.smooth_l1_loss(pred_bbox, target_bbox)
@@ -339,6 +425,49 @@ def compute_mrcnn_bbox_loss(mrcnn_pred_deltas, mrcnn_target_deltas, target_class
         loss.requires_grad = True
 
     return loss
+
+
+
+
+
+
+
+
+
+
+
+
+# def compute_mrcnn_mask_loss(target_masks, target_class_ids, pred_masks):
+#     """Mask binary cross-entropy loss for the masks head.
+
+#     target_masks: [batch, num_rois, height, width].
+#         A float32 tensor of values 0 or 1. Uses zero padding to fill array.
+#     target_class_ids: [batch, num_rois]. Integer class IDs. Zero padded.
+#     pred_masks: [batch, proposals, height, width, num_classes] float32 tensor
+#                 with values from 0 to 1.
+#     """
+#     if target_class_ids.size():
+#         # Only positive ROIs contribute to the loss. And only
+#         # the class specific mask of each ROI.
+#         positive_ix = torch.nonzero(target_class_ids > 0)[:, 0]
+#         positive_class_ids = target_class_ids[positive_ix.data].long()
+#         indices = torch.stack((positive_ix, positive_class_ids), dim=1)
+
+#         # Gather the masks (predicted and true) that contribute to loss
+#         y_true = target_masks[indices[:,0].data,:,:]
+#         y_pred = pred_masks[indices[:,0].data,indices[:,1].data,:,:]
+
+#         # Binary cross entropy
+#         loss = F.binary_cross_entropy(y_pred, y_true)
+#     else:
+#         loss = Variable(torch.FloatTensor([0]), requires_grad=False)
+#         if target_class_ids.is_cuda:
+#             loss = loss.cuda()
+
+#     return loss
+
+
+
 
 def compute_mrcnn_mask_loss(pred_masks, target_masks, target_class_ids):
     """
@@ -354,7 +483,10 @@ def compute_mrcnn_mask_loss(pred_masks, target_masks, target_class_ids):
         positive_ix = torch.nonzero(target_class_ids > 0)[:, 0]
         positive_class_ids = target_class_ids[positive_ix].long()
         y_true = target_masks[positive_ix, :, :].detach()
-        y_pred = pred_masks[positive_ix, positive_class_ids, :, :]
+        
+        
+        ### TIGER confused how this works for 3D data
+        y_pred = pred_masks[positive_ix, positive_class_ids, :, :]   
         loss = F.binary_cross_entropy(y_pred, y_true)
     else:
         loss = torch.Tensor([0]).cuda()
@@ -363,6 +495,44 @@ def compute_mrcnn_mask_loss(pred_masks, target_masks, target_class_ids):
         loss.requires_grad = True
 
     return loss
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def compute_mrcnn_class_loss(tasks, pred_class_logits, target_class_ids):
+#     """Loss for the classifier head of Mask RCNN.
+
+#     target_class_ids: [num_rois]. Integer class IDs. Uses zero
+#         padding to fill in the array.
+#     pred_class_logits: [batch, num_rois, num_classes]
+#     """
+
+
+#     """ TIGER note:    --- number of ROIs can be very small because this is only calculated
+#                         on ROIs that are output by the MaskRCNN. If there are no predictions, then no error    
+    
+#         """
+
+#     # Loss
+#     if target_class_ids.size():
+#         loss = F.cross_entropy(pred_class_logits,target_class_ids.long())
+#     else:
+#         loss = Variable(torch.FloatTensor([0]), requires_grad=False)
+#         if target_class_ids.is_cuda:
+#             loss = loss.cuda()
+
+#     return loss
+
+
 
 def compute_mrcnn_class_loss(tasks, pred_class_logits, target_class_ids):
     """
@@ -379,6 +549,14 @@ def compute_mrcnn_class_loss(tasks, pred_class_logits, target_class_ids):
         loss.requires_grad = True
 
     return loss
+
+
+
+
+
+
+
+
 
 def compute_mrcnn_regression_loss(tasks, pred, target, target_class_ids):
     """regression loss is a distance metric between target vector and predicted regression vector.
@@ -404,6 +582,10 @@ def compute_mrcnn_regression_loss(tasks, pred, target, target_class_ids):
         loss.requires_grad = True
 
     return loss
+
+
+
+
 
 ############################################################
 #  Detection Layer
@@ -503,6 +685,15 @@ class net(nn.Module):
         #
         # # generate proposals: apply predicted deltas to anchors and filter by foreground scores from RPN classifier.
         proposal_count = self.cf.post_nms_rois_training if is_training else self.cf.post_nms_rois_inference
+        
+        
+        
+        
+        """ TIGER --- what is going on below here???...
+        
+                    could we make this into just a simple forward pass???
+        """
+        
         batch_normed_props, batch_unnormed_props = mutils.refine_proposals(rpn_pred_probs, rpn_pred_deltas,
                                                                             proposal_count, self.anchors, self.cf)
 
@@ -569,6 +760,21 @@ class net(nn.Module):
 
         # re-use feature maps and RPN output from first forward pass.
         sample_proposals = self.rpn_rois_batch_info[sample_ics]
+        
+        
+        """ TIGER - remove SHEM sampling from above """
+        # re-use feature maps and RPN output from first forward pass.
+        #sample_proposals = self.rpn_rois_batch_info       
+        
+        # sample_target_deltas      = batch_gt_boxes
+        # sample_target_mask        = batch_gt_masks
+        # sample_target_class_ids   = batch_gt_class_ids
+        # sample_target_regressions = batch_gt_regressions
+        
+        
+        
+        
+        
         if not 0 in sample_proposals.size():
             sample_deltas, sample_logits, sample_regressions = self.classifier(self.mrcnn_feature_maps, sample_proposals)
             sample_mask = self.mask(self.mrcnn_feature_maps, sample_proposals)
@@ -775,11 +981,12 @@ class net(nn.Module):
                 box_results_list[b].append({'box_coords': r, 'box_type': 'prop'})
 
         # add positive and negative roi samples used for mrcnn losses to output list for monitoring.
-        if not 0 in sample_proposals.shape:
-            rois = mutils.clip_to_window(self.cf.window, sample_proposals).cpu().data.numpy()
-            for ix, r in enumerate(rois):
-                box_results_list[int(r[-1])].append({'box_coords': r[:-1] * self.cf.scale,
-                                            'box_type': 'pos_class' if target_class_ids[ix] > 0 else 'neg_class'})
+        ### TIGER - removed
+        # if not 0 in sample_proposals.shape:
+        #     rois = mutils.clip_to_window(self.cf.window, sample_proposals).cpu().data.numpy()
+        #     for ix, r in enumerate(rois):
+        #         box_results_list[int(r[-1])].append({'box_coords': r[:-1] * self.cf.scale,
+        #                                     'box_type': 'pos_class' if target_class_ids[ix] > 0 else 'neg_class'})
 
         # compute mrcnn losses.
         mrcnn_class_loss = compute_mrcnn_class_loss(self.cf.prediction_tasks, mrcnn_class_logits, target_class_ids)

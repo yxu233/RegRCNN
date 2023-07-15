@@ -27,6 +27,14 @@ import time
 
 import torch
 
+
+
+### TIGER ADDED:
+torch.cuda.set_device(1)
+torch.manual_seed(0)   ### for randomly selecting negative samples instead of SHEM
+
+
+
 import utils.exp_utils as utils
 from evaluator import Evaluator
 from predictor import Predictor
@@ -65,7 +73,8 @@ def train(cf, logger):
         optimizer = torch.optim.AdamW(utils.parse_params_for_optim(net, weight_decay=cf.weight_decay,
                                                                    exclude_from_wd=cf.exclude_from_wd,
                                                                    ), 
-                                      ### TIGER added: eps=1e-01,
+                                      ### TIGER added: 
+                                      #eps=1e-03,
                                       lr=cf.learning_rate[0])
     elif cf.optimizer == "SGD":
         optimizer = torch.optim.SGD(utils.parse_params_for_optim(net, weight_decay=cf.weight_decay),
@@ -123,7 +132,7 @@ def train(cf, logger):
             logger.time("train_batch_bw")
             optimizer.zero_grad()
             
-            print(results_dict['torch_loss'])
+            #print(results_dict['torch_loss'])
             
             results_dict['torch_loss'].backward()
             
@@ -179,12 +188,12 @@ def train(cf, logger):
             if not cf.server_env:
                 print("\rFinished training batch " +
                       "{}/{} in {:.1f}s ({:.2f}/{:.2f} forw load/net, {:.2f} backw).".format(i+1, cf.num_train_batches,
-                                                                                             logger.get_time("train_batch_loadfw")+
-                                                                                             logger.get_time("train_batch_netfw")
-                                                                                             +logger.time("train_batch_bw"),
-                                                                                             logger.get_time("train_batch_loadfw",reset=True),
-                                                                                             logger.get_time("train_batch_netfw", reset=True),
-                                                                                             logger.get_time("train_batch_bw", reset=True)), end="", flush=True)
+                                                                                              logger.get_time("train_batch_loadfw")+
+                                                                                              logger.get_time("train_batch_netfw")
+                                                                                              +logger.time("train_batch_bw"),
+                                                                                              logger.get_time("train_batch_loadfw",reset=True),
+                                                                                              logger.get_time("train_batch_netfw", reset=True),
+                                                                                              logger.get_time("train_batch_bw", reset=True)), end="", flush=True)
         print()
 
         #--------------- train eval ----------------
@@ -224,6 +233,8 @@ def train(cf, logger):
                                                                               logger.time("val_batch")), end="", flush=True)
             print()
 
+
+
             #------------ val eval -------------
             if (epoch - 1) % cf.plot_frequency == 0:
                 utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,
@@ -240,6 +251,56 @@ def train(cf, logger):
                 {str(g) : group['lr'] for (g, group) in enumerate(optimizer.param_groups)}})
             logger.metrics2tboard(monitor_metrics, global_step=epoch)
             logger.time("evals")
+            
+
+
+
+
+            #----------- Plot same image each time -------------
+            import numpy as np
+            import tifffile as tiff
+            out_file = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/output_batch/'
+            #loss_int = results_dict['torch_loss'].item() 
+            
+            batch_gen_test = data_loader.get_test_generator(cf, logger)
+            
+            pids = batch_gen_test["test"].dataset_pids
+            
+            batch = batch_gen_test['test'].generate_train_batch(pid=pids[0])
+            results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
+
+            if 'seg_preds' in results_dict.keys():
+                results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
+    
+
+            input_im = np.moveaxis(batch['data'], -1, 1) 
+            truth_im = np.moveaxis(batch['seg'], -1, 1) 
+            seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
+            
+     
+            inp = np.expand_dims(input_im[0], 0)
+            truth = np.expand_dims(truth_im[0], 0)
+            seg = np.expand_dims(seg_im[0], 0)
+            
+
+            ### plot concatenated TIFF
+            truth[truth > 0] = 65535
+            seg[seg > 0] = 65535
+            concat  = np.concatenate((inp, np.asarray(truth, dtype=np.uint16), np.asarray(seg, dtype=np.uint16)))
+
+            concat = np.moveaxis(concat, 0, 2)       
+            concat = np.moveaxis(concat, 0, 1)                         
+
+
+            tiff.imwrite(out_file + 'VAL_IM_epoch_' + str(epoch) + '_batch_' +  str(0)  + '_COMPOSITE.tif', concat,
+                          imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+         
+            
+            
+            
+            
+            
+            
 
             logger.info('finished epoch {}/{}, took {:.2f}s. train total: {:.2f}s, average: {:.2f}s. val total: {:.2f}s, average: {:.2f}s.'.format(
                 epoch, cf.num_epochs, logger.get_time("train_epoch")+logger.time("val_epoch"), logger.get_time("train_epoch"),
@@ -290,10 +351,13 @@ if __name__ == '__main__':
     ### FOR OLIGO TRAINING    
     parser.add_argument('--dataset_name', type=str, default='OL_data',
                         help="path to the dataset-specific code in source_dir/datasets")
-    parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/',
+    # parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/',
+    #                     help='path to experiment dir. will be created if non existent.')
+    
+    parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/',
                         help='path to experiment dir. will be created if non existent.')
     
-    
+        
     
     ### FOR CASPR TRAINING
     

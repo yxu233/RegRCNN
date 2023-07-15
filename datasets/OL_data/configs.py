@@ -484,6 +484,9 @@ class Configs(DefaultConfigs):
           self.learning_rate = [3e-4] * self.num_epochs
           
           
+          #self.learning_rate = [3e-4] * 300 + [3e-5] * 200 + [3e-6] * 10000
+          
+          
           #self.learning_rate = [1e-5] * self.num_epochs
           self.dynamic_lr_scheduling = False  # with scheduler set in exec
           
@@ -494,7 +497,7 @@ class Configs(DefaultConfigs):
               
               
       elif self.optimizer == 'SGD':
-          self.weight_decay = 0.000   ### detectron used 0.0, maskrcnn paper used 0.0001
+          self.weight_decay = 0.0001   ### detectron used 0.0, maskrcnn paper used 0.0001
           self.momentum = 0.9
           self.learning_rate = [0.002] * self.num_epochs   ### detectron used 0.001, maskrcnn paper used 0.02
           
@@ -717,6 +720,10 @@ class Configs(DefaultConfigs):
          #ROI_POSITIVE_RATIO = 0.33
       self.roi_positive_ratio = 0.2
 
+
+      #self.roi_positive_ratio = 0.5
+
+
       # k negative example candidates are drawn from a pool of size k*shem_poolsize (stochastic hard-example mining),
       # where k<=#positive examples.
       #self.shem_poolsize = 6
@@ -812,7 +819,7 @@ class Configs(DefaultConfigs):
       self.model_min_confidence = 0.2  # iou for nms in box refining (directly after heads), should be >0 since ths>=x in mrcnn.py
       
       ### FROM REGRCNN   
-      #self.detection_nms_threshold = 1e-5  # needs to be > 0, otherwise all predictions are one cluster.
+      self.detection_nms_threshold = 0.1  # needs to be > 0, otherwise all predictions are one cluster.
       # self.model_min_confidence = 0.1
 
 

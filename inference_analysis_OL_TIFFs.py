@@ -313,6 +313,16 @@ if __name__=="__main__":
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/51) ADAM_resnet101_wbc_no_weird_Z_bbox_ratios_got_better/'
             
             
+            #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/63) SHEM_removed_from_loss_forward_sampling_BEST/'
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/65) new_training_data_WBC/'
+                        
+            
+            #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/66) new_training_data_NO_dil_good_adjusted_LR_at300_epoch/'
+                        
+                        
+            
+           
+            
             self.server_env = False
             
             
@@ -480,7 +490,7 @@ if __name__=="__main__":
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
         foldername = input_path.split('/')[-2]
-        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_51)'
+        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_65)'
     
         """ For testing ILASTIK images """
         images = glob.glob(os.path.join(input_path,'*.tif'))    # can switch this to "*truth.tif" if there is no name for "input"
@@ -651,11 +661,7 @@ if __name__=="__main__":
                                #out_file = os.path.join(anal_dir, "straight_inference_fold_{}_pid_{}".format(str(cf.fold), pid))
                                 
                                 
-                               print(results_dict['seg_preds'].shape)
-                               print(batch['data'].shape)
-                                
-                               
-                    
+    
                     
                                import matplotlib
                                matplotlib.use('Qt5Agg')    
@@ -763,9 +769,31 @@ if __name__=="__main__":
                               
                                cleaned_seg = cleaned_seg[0, :, 0, :, :]
                             
-                            
+                               zzz
+ 
+                               inp = batch['data'][0]
+                               #truth_im = np.expand_dims(batch['seg'], axis=0)
+                               #seg_im = np.expand_dims(results_dict['seg_preds'], axis=0)
                                
+                               seg_im = np.copy(cleaned_seg)
+                               seg_im = np.moveaxis(seg_im, 0, -1)
+                               seg_im = np.expand_dims(seg_im, 0)
+                                
+                               ### plot concatenated TIFF
+                               #truth_im[truth_im > 0] = 65535
+                               #seg_im[seg_im > 0] = 65535
+                               concat  = np.concatenate((inp, np.asarray(seg_im, dtype=np.uint16)))
+                
+                               concat = np.moveaxis(concat, -1, 0)       
+                               #concat = np.moveaxis(concat, 0, 1)             
+                               concat = np.expand_dims(concat, 0)
                                
+                                
+                               tiff.imwrite(sav_dir + 'Block_' + str(int(total_blocks))  + '_COMPOSITE.tif', concat,
+                                              imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+                
+                                                               
+                                                               
                                """ ADD IN THE NEW SEG??? or just let it overlap??? """                     
                                
                                ### this simply uses the new seg

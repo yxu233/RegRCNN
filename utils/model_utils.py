@@ -853,10 +853,23 @@ def loss_example_mining(cf, batch_proposals, batch_gt_boxes, batch_gt_masks, bat
             negative_indices = torch.nonzero(negative_roi_bool).squeeze(1)
             r = 1.0 / cf.roi_positive_ratio
             b_neg_count = np.max((int(r * positive_samples - positive_samples), 1))
-            roi_scores_neg = batch_roi_scores[batch_element_indices[negative_indices]]
-            raw_sampled_indices = shem(roi_scores_neg, b_neg_count, cf.shem_poolsize)
+            
+
+            ### TIGER ---> this uses "roi_scores_neg" (i.e. the scores of the negative ROIs to pick out the WORST performing ones for training)
+            # roi_scores_neg = batch_roi_scores[batch_element_indices[negative_indices]]
+            # raw_sampled_indices = shem(roi_scores_neg, b_neg_count, cf.shem_poolsize)
+            
+            ### TIGER - MAKE THIS RANDOM INSTEAD OF SHEM            
+            rand_idx = torch.randperm(negative_indices.size()[0])
+            raw_sampled_indices = rand_idx[:b_neg_count]#.cuda()   
+            
+            
+            
             sample_negative_indices.append(batch_element_indices[negative_indices[raw_sampled_indices]])
             negative_count  += raw_sampled_indices.size()[0]
+        
+        ### TIGER added
+        print('num_pos: ' + str(positive_count) + ' num_neg: ' + str(negative_count))
 
     if len(sample_positive_indices) > 0:
         target_deltas = torch.cat(sample_deltas)
@@ -1539,7 +1552,7 @@ def shem(roi_probs_neg, negative_count, poolsize):
     limited negative proposals availabel, this function will return sampled indices of number < negative_count without
     throwing an error.
     """
-    # sort according to higehst foreground score.
+    # sort according to highest foreground score.
     probs, order = roi_probs_neg[:, 1:].max(1)[0].sort(descending=True)
     select = torch.tensor((poolsize * int(negative_count), order.size()[0])).min().int()
 

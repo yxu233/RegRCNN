@@ -342,7 +342,7 @@ if __name__=="__main__":
 
     """ TO LOAD OLD CHECKPOINT """
     # Read in file names
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
 
     from natsort import natsort_keygen, ns

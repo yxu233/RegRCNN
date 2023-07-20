@@ -335,7 +335,10 @@ def nms_numpy(box_coords, scores, thresh):
            coordinates of which maxima are taken need to be the lower coordinates"""
         areas *= (z2 - z1)
 
-    order = scores.argsort()[::-1]
+    #order = scores.argsort()[::-1]
+    
+    ### TIGER:
+    order = scores.argsort(axis=0)[::-1]
 
     keep = []
     while order.size > 0:  # order is the sorted index.  maps order to index: order[1] = 24 means (rank1, ix 24)

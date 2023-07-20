@@ -319,10 +319,20 @@ if __name__=="__main__":
             
             #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/66) new_training_data_NO_dil_good_adjusted_LR_at300_epoch/'
                         
-                        
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/67) det_nms_iou_0_1_BETTER/'
+                                    
             
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/69) dilated_data_det_nms_iou_0_1/'
            
             
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/71) dil_batch_norm/'
+                      
+            
+           
+           
+           
             self.server_env = False
             
             
@@ -439,6 +449,9 @@ if __name__=="__main__":
         pass
         net.load_state_dict(torch.load(weight_path))
         net.eval()
+        
+        net = net.cuda(device)
+        
     # generate a batch from test set and show results
     if not os.path.isdir(anal_dir):
         os.mkdir(anal_dir)
@@ -490,7 +503,7 @@ if __name__=="__main__":
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
         foldername = input_path.split('/')[-2]
-        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_65)'
+        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_71)'
     
         """ For testing ILASTIK images """
         images = glob.glob(os.path.join(input_path,'*.tif'))    # can switch this to "*truth.tif" if there is no name for "input"
@@ -570,6 +583,9 @@ if __name__=="__main__":
                 total_blocks = 0;
                 all_xyz = []                                               
                  
+                
+                box_coords_all = []
+                box_scores_all = []
                     
                 for x in range(0, width + quad_size, round(quad_size - quad_size * overlap_percent)):
                       if x + quad_size > width:
@@ -762,35 +778,68 @@ if __name__=="__main__":
                                     label_arr = np.moveaxis(label_arr, -1, 1)                                      
                                     
 
-                 
+                                
+
+                               """ Keep track of boxes for final nms??? """
+
+                               box_df = results_dict['boxes'][0]
+                               
+                               
+                               box_coords = []
+                               box_score = []
+                               for box in box_df:
+                                   box_coords.append(box['box_coords'])
+                                   box_score.append(box['box_score'])
+                               
+                               
+                               box_coords = np.vstack(box_coords)
+                               box_score = np.vstack(box_score)
+                               
+                               ### scale to real life dimensions
+                               box_coords[:, 0] = box_coords[:, 0] + y
+                               box_coords[:, 2] = box_coords[:, 2] + y
+                               
+                               box_coords[:, 1] = box_coords[:, 1] + x
+                               box_coords[:, 3] = box_coords[:, 3] + x
+                               
+                               box_coords[:, 4] = box_coords[:, 4] + z
+                               box_coords[:, 5] = box_coords[:, 5] + z
+                               
+
+                               
+                               box_coords_all.append(box_coords)
+                               box_scores_all.append(box_score)
+
+                               
+                               
 
 
                                cleaned_seg = np.asarray(label_arr, dtype=np.uint8)
                               
                                cleaned_seg = cleaned_seg[0, :, 0, :, :]
                             
-                               zzz
- 
-                               inp = batch['data'][0]
-                               #truth_im = np.expand_dims(batch['seg'], axis=0)
-                               #seg_im = np.expand_dims(results_dict['seg_preds'], axis=0)
                                
-                               seg_im = np.copy(cleaned_seg)
-                               seg_im = np.moveaxis(seg_im, 0, -1)
-                               seg_im = np.expand_dims(seg_im, 0)
+                               """ Plot output to check """
+                               # inp = batch['data'][0]
+                               # #truth_im = np.expand_dims(batch['seg'], axis=0)
+                               # #seg_im = np.expand_dims(results_dict['seg_preds'], axis=0)
+                               
+                               # seg_im = np.copy(cleaned_seg)
+                               # seg_im = np.moveaxis(seg_im, 0, -1)
+                               # seg_im = np.expand_dims(seg_im, 0)
                                 
-                               ### plot concatenated TIFF
-                               #truth_im[truth_im > 0] = 65535
-                               #seg_im[seg_im > 0] = 65535
-                               concat  = np.concatenate((inp, np.asarray(seg_im, dtype=np.uint16)))
+                               # ### plot concatenated TIFF
+                               # #truth_im[truth_im > 0] = 65535
+                               # #seg_im[seg_im > 0] = 65535
+                               # concat  = np.concatenate((inp, np.asarray(seg_im, dtype=np.uint16)))
                 
-                               concat = np.moveaxis(concat, -1, 0)       
-                               #concat = np.moveaxis(concat, 0, 1)             
-                               concat = np.expand_dims(concat, 0)
+                               # concat = np.moveaxis(concat, -1, 0)       
+                               # #concat = np.moveaxis(concat, 0, 1)             
+                               # concat = np.expand_dims(concat, 0)
                                
                                 
-                               tiff.imwrite(sav_dir + 'Block_' + str(int(total_blocks))  + '_COMPOSITE.tif', concat,
-                                              imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+                               # tiff.imwrite(sav_dir + 'Block_' + str(int(total_blocks))  + '_COMPOSITE.tif', concat,
+                               #                imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
                 
                                                                
                                                                
@@ -806,9 +855,25 @@ if __name__=="__main__":
                                total_blocks += 1
                                
                                
+                               
+                               
+                """ Final NMS """
 
-                               
-                               
+                # import utils.model_utils as model_utils
+                # ### takes as input: box_coords, scores, thresh
+                # thresh_nms = 0.1  ### det_nms_thresh essentially right?
+                # thresh_nms = cf.detection_nms_threshold
+                
+                
+                # box_coords = np.vstack(box_coords_all)
+                # box_scores = np.vstack(box_scores_all)
+                
+                # keep = model_utils.nms_numpy(box_coords, box_scores, thresh=thresh)
+                # keep = np.vstack(keep)
+                # box_clean = box_coords[keep]
+                # box_score = box_score[keep]
+                                               
+                #zzz
                                
 
                 #segmentation[segmentation > 0] = 255

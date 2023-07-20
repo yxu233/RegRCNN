@@ -55,6 +55,11 @@ class ConvGenerator():
                     norm_layer = nn.InstanceNorm3d(c_out)
                 elif norm == 'batch_norm':
                     norm_layer = nn.BatchNorm3d(c_out)
+                    
+                ### TIGER added
+                elif norm == 'group_norm':
+                    norm_layer = nn.GroupNorm(2, c_out)
+                    
                 else:
                     raise ValueError('norm type as specified in configs is not implemented... {}'.format(norm))
                 module = nn.Sequential(module, norm_layer)

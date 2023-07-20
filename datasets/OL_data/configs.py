@@ -156,7 +156,12 @@ class Configs(DefaultConfigs):
         self.start_filts = 48 if self.dim == 2 else 18
         self.end_filts = self.start_filts * 4 if self.dim == 2 else self.start_filts * 2
         self.res_architecture = 'resnet101' # 'resnet101' , 'resnet50'  ### TIGER CHANGED TO 101
-        self.norm = 'instance_norm' # one of None, 'instance_norm', 'batch_norm'
+        #self.norm = 'instance_norm' # one of None, 'instance_norm', 'batch_norm'
+        #self.norm = 'batch_norm' # one of None, 'instance_norm', 'batch_norm'
+        
+        self.norm = 'group_norm' # one of None, 'instance_norm', 'batch_norm'
+        
+        
         self.relu = 'relu'
         # one of 'xavier_uniform', 'xavier_normal', or 'kaiming_normal', None (=default = 'kaiming_uniform')
         self.weight_init = None
@@ -277,8 +282,51 @@ class Configs(DefaultConfigs):
         #self.do_aug = True
         self.do_aug = False      ### TIGER - turned off data augmentation
         
+        """
         
+            Args:
+        patch_size (tuple/list/ndarray of int): Output patch size
+
+        patch_center_dist_from_border (tuple/list/ndarray of int, or int): How far should the center pixel of the
+        extracted patch be from the image border? Recommended to use patch_size//2.
+        This only applies when random_crop=True
+
+        do_elastic_deform (bool): Whether or not to apply elastic deformation
+
+            alpha (tuple of float): magnitude of the elastic deformation; randomly sampled from interval
+    
+            sigma (tuple of float): scale of the elastic deformation (small = local, large = global); randomly sampled
+            from interval
+
+        do_rotation (bool): Whether or not to apply rotation
+
+            angle_x, angle_y, angle_z (tuple of float): angle in rad; randomly sampled from interval. Always double check
+            whether axes are correct!
+
+        do_scale (bool): Whether or not to apply scaling
+
+            scale (tuple of float): scale range ; scale is randomly sampled from interval
+
+        border_mode_data: How to treat border pixels in data? see scipy.ndimage.map_coordinates
+
+        border_cval_data: If border_mode_data=constant, what value to use?
+
+        order_data: Order of interpolation for data. see scipy.ndimage.map_coordinates
+
+        border_mode_seg: How to treat border pixels in seg? see scipy.ndimage.map_coordinates
+
+        border_cval_seg: If border_mode_seg=constant, what value to use?
+
+        order_seg: Order of interpolation for seg. see scipy.ndimage.map_coordinates. Strongly recommended to use 0!
+        If !=0 then you will have to round to int and also beware of interpolation artifacts if you have more then
+        labels 0 and 1. (for example if you have [0, 0, 0, 2, 2, 1, 0] the neighboring [0, 0, 2] bay result in [0, 1, 2])
+
+        random_crop: True: do a random crop of size patch_size and minimal distance to border of
+        patch_center_dist_from_border. False: do a center crop of size patch_size
+
+        independent_scale_for_each_axis: If True, a scale factor will be chosen independently for each axis.
         
+        """
         
         self.da_kwargs = {
             'mirror': True,
@@ -291,7 +339,7 @@ class Configs(DefaultConfigs):
             'angle_y': (0., 0),
             'angle_z': (0., 0),
             'do_scale': True,   ### Tiger changed to True
-            'scale': (0.8, 1.1),
+            'scale': (0.8, 1.2),
             'random_crop': False,
             'rand_crop_dist': (self.patch_size[0] / 2. - 3, self.patch_size[1] / 2. - 3),
             'border_mode_data': 'constant',
@@ -562,7 +610,7 @@ class Configs(DefaultConfigs):
       #self.backbone_strides = {'xy': [4, 8, 16, 16], 'z': [1, 2, 4, 8]}
 
       
-      #self.rpn_anchor_scales = {'xy': [[5], [10], [15], [25]], 'z': [[2], [5], [8], [12]]}
+      #self.rpn_anchor_scales = {'xy': [[5], [10], [15], [20]], 'z': [[2], [4], [6], [8]]}
             
       
       #self.rpn_anchor_scales = {'xy': [[4, 4, 4, 4], [8, 8, 8, 8], [16, 16, 16, 16], [32, 32, 32, 32]], 'z': [[1, 1, 1,1], [2, 2, 2, 2], [4, 4, 4, 4], [8, 8, 8, 8]]}
@@ -819,7 +867,7 @@ class Configs(DefaultConfigs):
       self.model_min_confidence = 0.2  # iou for nms in box refining (directly after heads), should be >0 since ths>=x in mrcnn.py
       
       ### FROM REGRCNN   
-      self.detection_nms_threshold = 0.1  # needs to be > 0, otherwise all predictions are one cluster.
+      self.detection_nms_threshold = 0.2  # needs to be > 0, otherwise all predictions are one cluster.
       # self.model_min_confidence = 0.1
 
 

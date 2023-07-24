@@ -432,9 +432,9 @@ class Configs(DefaultConfigs):
         # aggregation method for test and val_patient predictions.
         # wbc = weighted box clustering as in https://arxiv.org/pdf/1811.08661.pdf,
         # nms = standard non-maximum suppression, or None = no clustering
-        self.clustering = 'wbc'
+        #self.clustering = 'wbc'
         
-        #self.clustering = 'nms'
+        self.clustering = 'nms'
         
         
         # iou thresh (exclusive!) for regarding two preds as concerning the same ROI

@@ -312,7 +312,7 @@ def unmold_mask_3D(mask, bbox, image_shape):
     full_mask[y1:y2, x1:x2, z1:z2] = mask
     return full_mask
 
-def nms_numpy(box_coords, scores, thresh):
+def nms_numpy(box_coords, scores, thresh_nms):
     """ non-maximum suppression on 2D or 3D boxes in numpy.
     :param box_coords: [y1,x1,y2,x2 (,z1,z2)] with y1<=y2, x1<=x2, z1<=z2.
     :param scores: ranking scores (higher score == higher rank) of boxes.
@@ -347,10 +347,13 @@ def nms_numpy(box_coords, scores, thresh):
         xx1 = np.maximum(x1[i], x1[order])
         yy2 = np.minimum(y2[i], y2[order])
         xx2 = np.minimum(x2[i], x2[order])
+        
+        
 
         h = np.maximum(0.0, yy2 - yy1)
         w = np.maximum(0.0, xx2 - xx1)
         inter = h * w
+
 
         if is_3d:
             zz1 = np.maximum(z1[i], z1[order])
@@ -359,10 +362,22 @@ def nms_numpy(box_coords, scores, thresh):
             inter *= d
 
         iou = inter / (areas[i] + areas[order] - inter)
-
-        non_matches = np.nonzero(iou <= thresh)[0]  # get all elements that were not matched and discard all others.
+        
+        non_matches = np.nonzero(iou <= thresh_nms)[0]  # get all elements that were not matched and discard all others.
+        
         order = order[non_matches]
-        keep.append(i)
+        
+        
+        
+        ### MEMORY LEAK!!!
+        #keep.append(i)
+        
+        
+        keep.append(i[0])
+        
+        
+        
+        print(order.size)
 
     return keep
 

@@ -114,8 +114,8 @@ def train(cf, logger):
             
             
             ### TIGER - if fully empty, skip
-            if batch['empty_counts'] > 0:
-                continue
+            # if batch['empty_counts'] > 0:
+            #     continue
             
             
             

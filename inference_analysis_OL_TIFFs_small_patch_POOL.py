@@ -32,6 +32,8 @@ print(device)
 
 def post_process_boxes(kwargs):                   
 
+    ### NEED TO ADAPT IF BATCH_SIZE > 1    
+
     box_vert = kwargs['box_vert']
     results_dict = kwargs['results_dict']
     patch_im = kwargs['patch_im']    
@@ -59,23 +61,23 @@ def post_process_boxes(kwargs):
     """ Filter boxes by EDGE of focal cube BEFORE running split box analysis """
     
     ### find centroids of boxes
-    centroids = [(box_vert[:, 2] - box_vert[:, 0])/2 + box_vert[:, 0], (box_vert[:, 3] - box_vert[:, 1])/2 + box_vert[:, 1], (box_vert[:, 5] - box_vert[:, 4])/2 + box_vert[:, 4]]
+    # centroids = [(box_vert[:, 2] - box_vert[:, 0])/2 + box_vert[:, 0], (box_vert[:, 3] - box_vert[:, 1])/2 + box_vert[:, 1], (box_vert[:, 5] - box_vert[:, 4])/2 + box_vert[:, 4]]
     
-    centroids = np.transpose(centroids)
-    centroids = np.round(centroids).astype(int)
-    #centroids = centroids - 1 ### cuz indices dont start from 0 from polygon function?
+    # centroids = np.transpose(centroids)
+    # centroids = np.round(centroids).astype(int)
+    # #centroids = centroids - 1 ### cuz indices dont start from 0 from polygon function?
     
     
-    centroids[np.where(centroids[:, 2] >= patch_depth)[0], 2] = patch_depth - 1
-    centroids[np.where(centroids[:, 1] >= patch_size)[0], 1] = patch_size - 1
-    centroids[np.where(centroids[:, 0] >= patch_size)[0], 0] = patch_size - 1
+    # centroids[np.where(centroids[:, 2] >= patch_depth)[0], 2] = patch_depth - 1
+    # centroids[np.where(centroids[:, 1] >= patch_size)[0], 1] = patch_size - 1
+    # centroids[np.where(centroids[:, 0] >= patch_size)[0], 0] = patch_size - 1
     
   
-    ### Then filter using focal cube
-    keep_ids = np.where(focal_cube[centroids[:, 2], centroids[:, 0], centroids[:, 1]] == 0)[0]
-    print('num deleted: ' + str(len(centroids) - len(keep_ids)))
+    # ### Then filter using focal cube
+    # keep_ids = np.where(focal_cube[centroids[:, 2], centroids[:, 0], centroids[:, 1]] == 0)[0]
+    # print('num deleted: ' + str(len(centroids) - len(keep_ids)))
 
-    box_vert = box_vert[keep_ids]
+    # box_vert = box_vert[keep_ids]
 
 
 
@@ -84,130 +86,135 @@ def post_process_boxes(kwargs):
         return []
 
 
-    df_cleaned = split_boxes_by_Voronoi(box_vert, vol_shape=patch_im.shape)
+    df_cleaned = split_boxes_by_Voronoi3D(box_vert, vol_shape = patch_im.shape)
+    merged_coords = df_cleaned['bbox_coords'].values
+
+    # df_cleaned = split_boxes_by_Voronoi(box_vert, vol_shape=patch_im.shape)
 
      
-     ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
-     #df_cleaned = df_cleaned[df_cleaned['bbox_coords'].map(len) > 0]
+    #  ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
+    #  #df_cleaned = df_cleaned[df_cleaned['bbox_coords'].map(len) > 0]
      
      
-    ### merge coords back into coherent boxes!
-    merged_coords = [ [] for _ in range(len(box_vert)) ]
-    for box_id in np.unique(df_cleaned['ids']):
-         coords = df_cleaned.iloc[np.where(df_cleaned['ids'] == box_id)[0]]['bbox_coords']
+    # ### merge coords back into coherent boxes!
+    # merged_coords = [ [] for _ in range(len(box_vert)) ]
+    # for box_id in np.unique(df_cleaned['ids']):
+    #      coords = df_cleaned.iloc[np.where(df_cleaned['ids'] == box_id)[0]]['bbox_coords']
          
-         ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
-         coords = coords[coords.map(len) > 0]
-         if len(coords) > 0:                                        
-             coords = np.vstack(coords).astype(int)
+    #      ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
+    #      coords = coords[coords.map(len) > 0]
+    #      if len(coords) > 0:                                        
+    #          coords = np.vstack(coords).astype(int)
              
-         merged_coords[box_id] = coords                                            
+    #      merged_coords[box_id] = coords                                            
 
-    """ 
-            ***ALSO SPLIT IN Z-dimension???     
-    """
-    box_vert = np.vstack(box_vert)
-    box_vert_z = np.copy(box_vert)
-    box_vert_z[:, 0] = box_vert[:, 4]
-    box_vert_z[:, 2] = box_vert[:, 5]
-    box_vert_z[:, 4] = box_vert[:, 0]
-    box_vert_z[:, 5] = box_vert[:, 2]
+    # """ 
+    #         ***ALSO SPLIT IN Z-dimension???     
+    # """
+    # box_vert = np.vstack(box_vert)
+    # box_vert_z = np.copy(box_vert)
+    # box_vert_z[:, 0] = box_vert[:, 4]
+    # box_vert_z[:, 2] = box_vert[:, 5]
+    # box_vert_z[:, 4] = box_vert[:, 0]
+    # box_vert_z[:, 5] = box_vert[:, 2]
 
 
-    df_cleaned_z = split_boxes_by_Voronoi(box_vert_z, vol_shape=np.moveaxis(patch_im, 0, 1).shape)
+    # df_cleaned_z = split_boxes_by_Voronoi(box_vert_z, vol_shape=np.moveaxis(patch_im, 0, 1).shape)
                 
-    ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
-    #df_cleaned_z = df_cleaned_z[df_cleaned_z['bbox_coords'].map(len) > 0]
+    # ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
+    # #df_cleaned_z = df_cleaned_z[df_cleaned_z['bbox_coords'].map(len) > 0]
     
                                         
     
-    ### merge coords back into coherent boxes!
-    merged_coords_z = [ [] for _ in range(len(box_vert_z)) ]
-    for box_id in np.unique(df_cleaned_z['ids']):
+    # ### merge coords back into coherent boxes!
+    # merged_coords_z = [ [] for _ in range(len(box_vert_z)) ]
+    # for box_id in np.unique(df_cleaned_z['ids']):
     
-        coords = df_cleaned_z.iloc[np.where(df_cleaned_z['ids'] == box_id)[0]]['bbox_coords']   
+    #     coords = df_cleaned_z.iloc[np.where(df_cleaned_z['ids'] == box_id)[0]]['bbox_coords']   
         
-        ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
-        coords = coords[coords.map(len) > 0]
-        if len(coords) > 0:
-            coords = np.vstack(coords).astype(int)
+    #     ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
+    #     coords = coords[coords.map(len) > 0]
+    #     if len(coords) > 0:
+    #         coords = np.vstack(coords).astype(int)
             
-            #print()
+    #         #print()
             
-            ### swap axis
-            coords[:, [2, 1]] = coords[:, [1, 2]]   ### used to be this for split_boxes no voronoi
-            #coords[:, [2, 0]] = coords[:, [0, 2]]
+    #         ### swap axis
+    #         coords[:, [2, 1]] = coords[:, [1, 2]]   ### used to be this for split_boxes no voronoi
+    #         #coords[:, [2, 0]] = coords[:, [0, 2]]
             
-        merged_coords_z[box_id] = coords      
+    #     merged_coords_z[box_id] = coords      
         
 
-    ### COMBINE all the splits in XY and Z
-    if len(merged_coords) != len(merged_coords_z):
-        print('NOT MATCHED LENGTH')
-        #zzz
+    # ### COMBINE all the splits in XY and Z
+    # if len(merged_coords) != len(merged_coords_z):
+    #     print('NOT MATCHED LENGTH')
+    #     #zzz
         
         
-    match_xyz = []
-    for id_m in range(len(merged_coords)):
+    # match_xyz = []
+    # for id_m in range(len(merged_coords)):
         
-        a = merged_coords[id_m]
-        b = merged_coords_z[id_m]
+    #     a = merged_coords[id_m]
+    #     b = merged_coords_z[id_m]
         
-         ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
-        if len(a) == 0 and len(b) == 0:
-            continue
-        elif len(a) == 0:
-            match_xyz.append(b)
-        elif len(b) == 0:
-            match_xyz.append(a)
-        else:
-            unq, count = np.unique(np.concatenate((a, b)), axis=0, return_counts=True)                                        
-            matched = unq[count > 1]
+    #      ### REMOVE ROWS THAT HAD NO MATCHING BOX AT THE END (usually due to too much overlap)
+    #     if len(a) == 0 and len(b) == 0:
+    #         continue
+    #     elif len(a) == 0:
+    #         match_xyz.append(b)
+    #     elif len(b) == 0:
+    #         match_xyz.append(a)
+    #     else:
+    #         unq, count = np.unique(np.concatenate((a, b)), axis=0, return_counts=True)                                        
+    #         matched = unq[count > 1]
             
-            match_xyz.append(matched)
+    #         match_xyz.append(matched)
                                         
 
-    merged_coords = match_xyz
+    # merged_coords = match_xyz
     
 
                                               
-    
+
     ### Then APPLY these boxes to mask out the objects in the main segmentation!!!
     new_labels = np.zeros(np.shape(label_arr))
     for box_id, box_coords in enumerate(merged_coords):
     
+        ### SOME BOXES GET LOST?
+        if len(box_coords) == 0:
+            print('BOX WAS FULLY SUBTRACTED')
+            continue
+            
+        ### swap axis
+        box_coords[:, [2, 0]] = box_coords[:, [0, 2]]  
         bc = box_coords
         """ HACK: --- DOUBLE CHECK ON THIS SUBTRACTION HERE """
         
         #bc = bc - 1 ### cuz indices dont start from 0 from polygon function?
-        bc[np.where(bc[:, 2] >= patch_depth)[0], 2] = patch_depth - 1
-        bc[np.where(bc[:, 1] >= patch_size)[0], 1] = patch_size - 1
-        bc[np.where(bc[:, 0] >= patch_size)[0], 0] = patch_size - 1
-        
-        
         bc = np.asarray(bc, dtype=int)                    
         new_labels[0, 0, bc[:, 1], bc[:, 0], bc[:, 2]] = box_id + 1   
         
 
     new_labels[label_arr == 0] = 0   ### This is way simpler and faster than old method of looping through each detection
-
-
+    
+    
     """ Then find which ones are on the edge and remove, then save coords of cells for the very end """
     
     if len(np.unique(new_labels)) == 1:
         print('WEIRD')
         return []
     
-    print(total_blocks)
+    #print(total_blocks)
     
     new_labels = np.asarray(new_labels, dtype=int)
     cc = regionprops_table(new_labels[0][0], properties=('centroid', 'coords'))
     
     df = pd.DataFrame(cc)
     # ### Then filter using focal cube
-    # edge_ids = np.where(focal_cube[np.asarray(df['centroid-2']), np.asarray(df['centroid-0']), np.asarray(df['centroid-1'])])[0]
-    # print('num deleted: ' + str(len(edge_ids)))
-    # df = df.drop(edge_ids)
+    edge_ids = np.where(focal_cube[np.asarray(df['centroid-2']), np.asarray(df['centroid-0']), np.asarray(df['centroid-1'])])[0]
+    #print('num deleted: ' + str(len(edge_ids)))
+    df = df.drop(edge_ids)
     
 
 
@@ -246,7 +253,7 @@ if __name__=="__main__":
             self.dataset_name = "datasets/OL_data"
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/73) dil_group_norm_det_thresh_0_2/'      
 
-            #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/76) dil_group_norm_NEW_DATA_edges_wbc/'                  
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/76) dil_group_norm_NEW_DATA_edges_wbc/'                  
             self.server_env = False
 
 
@@ -356,7 +363,7 @@ if __name__=="__main__":
                 patch_size=128; patch_depth=16
                 
                 ### Define overlap and focal cube to remove cells that fall within this edge
-                overlap_pxy = 14; overlap_pz = 2
+                overlap_pxy = 14; overlap_pz = 3
                 step_xy = patch_size - overlap_pxy * 2
                 step_z = patch_depth - overlap_pz * 2
                 
@@ -400,6 +407,10 @@ if __name__=="__main__":
                 
                 all_patches = []
                 
+                batch_size = 1
+                batch_im = []
+                batch_xyz = []
+                
                 for z in range(0, depth_im + patch_depth, round(step_z)):
                     if z + patch_depth > depth_im:  continue
 
@@ -413,64 +424,72 @@ if __name__=="__main__":
 
                                all_xyz.append([x, y, z])
 
-                               print(total_blocks)
-                               total_blocks += 1
+
                                
                                quad_intensity = input_im[z:z + patch_depth,  x:x + patch_size, y:y + patch_size];  
                                quad_intensity = np.moveaxis(quad_intensity, 0, -1)
                                quad_intensity = np.asarray(np.expand_dims(np.expand_dims(quad_intensity, axis=0), axis=0), dtype=np.float16)
+                               
+                               
+                               if len(batch_im) > 0:
+                                   batch_im = np.concatenate((batch_im, quad_intensity))
+                               else:
+                                   batch_im = quad_intensity
+                               
+                               
+                               batch_xyz.append([x,y,z])
+                               
+                               print(total_blocks)
+                               total_blocks += 1   
+                               
+                               if total_blocks % batch_size == 0:
       
 
-                               batch = {'data':quad_intensity, 'seg': np.zeros([1, 1, patch_size, patch_size, patch_depth]), 
-                                         'class_targets': np.asarray([]), 'bb_targets': np.asarray([]), 
-                                         'roi_masks': np.zeros([1, 1, 1, patch_size, patch_size, patch_depth]),
-                                         'patient_bb_target': np.asarray([]), 'original_img_shape': quad_intensity.shape,
-                                         'patient_class_targets': np.asarray([]), 'pid': ['0']}
-                                
-                               ### run MaskRCNN
-                               results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
-                               
-
-                               if 'seg_preds' in results_dict.keys():
-                                    results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
-
-                               seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
-                                
-
-                               box_df = results_dict['boxes'][0]
-                               box_vert = []
-                               box_score = []
-                               for box in box_df:
-                                   if box['box_score'] > thresh:
-                                       box_vert.append(box['box_coords'])
-                                       box_score.append(box['box_score'])
-                                       
-                                       
-                               if len(box_vert) == 0:
-                                   continue
-
-
-                               patch_im = np.copy(quad_intensity[0][0])
-                               patch_im = np.moveaxis(patch_im, -1, 0)   ### must be depth first
-                                
-            
-                               all_patches.append({'box_vert':box_vert, 'results_dict': results_dict, 'patch_im': patch_im, 'total_blocks':total_blocks, 
-                                                    'focal_cube':focal_cube, 'xyz':[x,y,z]})
+                                   batch = {'data':batch_im, 'seg': np.zeros([batch_size, 1, patch_size, patch_size, patch_depth]), 
+                                             'class_targets': np.asarray([]), 'bb_targets': np.asarray([]), 
+                                             'roi_masks': np.zeros([batch_size, 1, 1, patch_size, patch_size, patch_depth]),
+                                             'patient_bb_target': np.asarray([]), 'original_img_shape': quad_intensity.shape,
+                                             'patient_class_targets': np.asarray([]), 'pid': ['0']}
                                    
-                               # if total_blocks == 80:
-                               #      zzz
+                                   
+                                   ### run MaskRCNN
+                                   results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
+                                   
+    
+                                   if 'seg_preds' in results_dict.keys():
+                                        results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
+    
+                                   #seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
                                     
-
-                               # ### if want just pure segmentations without any subtraction
-                               #label_arr = np.asarray(label_arr, dtype=np.uint16)   
-                               #whole_seg = np.asarray(seg_im, dtype=np.uint8)        
-                               #whole_seg = whole_seg[0, :, 0, :, :]
-                            
-                               ### this is adding,
-                               #segmentation[z:z + patch_depth, x:x + patch_size, y:y + patch_size] = whole_seg + segmentation[z:z + patch_depth, x:x + patch_size, y:y + patch_size]
-                          
+                                   for bs in range(batch_size):
+    
+                                       box_df = results_dict['boxes'][bs]
+                                       box_vert = []
+                                       box_score = []
+                                       for box in box_df:
+                                           if box['box_score'] > thresh:
+                                               box_vert.append(box['box_coords'])
+                                               box_score.append(box['box_score'])
+                                               
+                                               
+                                       if len(box_vert) == 0:
+                                           continue
+        
+        
+                                       patch_im = np.copy(batch_im[bs][0])
+                                       patch_im = np.moveaxis(patch_im, -1, 0)   ### must be depth first
+                                        
+                    
+                                       all_patches.append({'box_vert':box_vert, 'results_dict': results_dict, 'patch_im': patch_im, 'total_blocks': bs % total_blocks + (total_blocks - batch_size), 
+                                                            'focal_cube':focal_cube, 'xyz':batch_xyz[bs]})
+                                       
+                                   ### Reset batch
+                                   batch_im = []
+                                   batch_xyz = []
+                                           
+                                   
                 p = Pool(8)
-                #kwargs  = [{"gdf":gdf, "index":i, "margin":margin, "line_mult":line_mult} for i in range(len(gdf))]
+
                 box_coords_all = p.map(post_process_boxes, all_patches)
                  
                 p.close()  ### to prevent memory leak
@@ -515,22 +534,8 @@ if __name__=="__main__":
                                       imagej=True, #resolution=(1/XY_res, 1/XY_res),
                                       metadata={'spacing':1, 'unit': 'um', 'axes': 'TZCYX'})  
                 
-                
-                
-                
-                        
-                from skimage import morphology
-                ball = morphology.ball(1)
-                dil_box = morphology.dilation(stepwise_im, selem=ball)
-                
-                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_stepwise_im_DIL.tif', dil_box)
-                                
-                
-                
-                
-                lab_boxes = morphology.erosion(dil_box, selem=ball)
-        
-                
+                zzz
+
 ###########################################################################################        
         
 
@@ -542,66 +547,127 @@ if __name__=="__main__":
                         - and clean 
                 
                 """
+            
                 
-                zzz
-
-                doublets = np.zeros(np.shape(segmentation))
+                def get_boxes_from_doublets(all_box_coords):
+                    doublets = np.zeros(np.shape(segmentation))
                 
-                sizes = []
-                
-                #shuffled = np.copy(box_coords_all)
-                #random.shuffle(shuffled)    ### for plotting so it's more visible
-                for coords in all_box_coords:
-                            sizes.append(len(coords))
-                            if len(coords) < size_thresh:
-                                continue
-                            
-                            doublets[coords[:, 2], coords[:, 0], coords[:, 1]] = doublets[coords[:, 2], coords[:, 0], coords[:, 1]] + 1
-                            
-                            
-                    
-                doublets[doublets <= 1] = 0
-                doublets[doublets > 0] = 1
-                
-                lab = label(doublets)
-                cc = regionprops(lab)
-
-                print('num doublets: ' + str(len(cc)))
-                
-                cleaned = np.zeros(np.shape(doublets))
-
-                arr_doublets = [ [] for _ in range(len(cc) + 1)]
-                box_ids = [ [] for _ in range(len(cc) + 1)]
-                
-                for b_id, coords in enumerate(all_box_coords):  
-                            region = lab[coords[:, 2], coords[:, 0], coords[:, 1]]
-                            
-                            if len(np.where(region)[0]) > 0:
+                    doublets = np.moveaxis(doublets, 0, -1)                    
+                    sizes = []
+                    for coords in all_box_coords:
+                                sizes.append(len(coords))
+                                if len(coords) < size_thresh:
+                                    continue
+                                doublets[coords[:, 0], coords[:, 1], coords[:, 2]] = doublets[coords[:, 0], coords[:, 1], coords[:, 2]] + 1
                                 
-                                ids = np.unique(region)
-                                ids = ids[ids != 0]   ### remove zero
-                                #if len(ids) > 1:
-                                    #zzz
-                                    #print(ids)
-                                    
-                                for id_o in ids:
-                                    arr_doublets[id_o].append(coords)
-                                    box_ids[id_o].append(b_id)
+                    doublets[doublets <= 1] = 0
+                    doublets[doublets > 0] = 1                    
+                    
+                    
+                    lab = label(doublets)
+                    cc = regionprops(lab)
+    
+                    print('num doublets: ' + str(len(cc)))
+        
+                    cleaned = np.zeros(np.shape(doublets))
+                    arr_doublets = [ [] for _ in range(len(cc) + 1)]  ### start at 1 because no zero value objects in array!!!
+                    box_ids = [ [] for _ in range(len(cc) + 1)]
+                    for b_id, coords in enumerate(all_box_coords):  
+                                region = lab[coords[:, 0], coords[:, 1], coords[:, 2]]
+                                if len(np.where(region)[0]) > 0:
+                                    ids = np.unique(region)
+                                    ids = ids[ids != 0]   ### remove zero
+                                    for id_o in ids:
+                                        arr_doublets[id_o].append(coords)
+                                        box_ids[id_o].append(b_id)
+                                
+                    return doublets, arr_doublets, box_ids, cc
+                                
                                 
                             
-                    
-                ### loop through all doublets and determine iou
-                iou_thresh = 0.7
+                doublets, arr_doublets, box_ids, cc = get_boxes_from_doublets(all_box_coords)
+                            
+                sav_doubs = np.moveaxis(doublets, -1, 0)
+                sav_doubs = np.asarray(sav_doubs, dtype=np.int32)
+                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_doublets.tif', sav_doubs)
+
                 
+
+                    
+                """First pass through just identifies all overlaps with 2 boxes only 
+                        ***and ADDS their segmentations together so less weird subtraction artifacts
+                
+                """
+                iou_thresh = 0.2
                 clean_box_coords = np.copy(all_box_coords)
+                num_doubs = 0
+                for case_id, case in enumerate(arr_doublets):
+                    
+                    if len(case) == 0:
+                        continue
+                    box_nums = np.asarray(box_ids[case_id])
+
+                    ### Find identical rows that match to overlap region
+                    overlap = cc[case_id - 1]['coords']    ### case_id minus 1 when indexing cc because no region of value zero from above
+                    
+                    ### Next calculate iou for each individual case
+                    iou_per_case = []
+                    for reg in case:
+                        intersect = (reg[:, None] == overlap).all(-1).any(-1)
+                        intersect = reg[intersect]
+                        intersect = len(intersect)
+                        
+                        union = len(np.unique(np.vstack([overlap, reg]), axis=0))
+                        
+                        iou_per_case.append(intersect/union)
+                    iou_per_case = np.asarray(iou_per_case)
+
+                    
+                    box_nums = np.asarray(box_ids[case_id])                
+                    ### The majority of cases only have 2 things overlapping AND have high overlap
+                    if len(box_nums) == 2 and len(np.where(iou_per_case > iou_thresh)[0]) == len(box_nums):  
+                        ### In the case of doublets with HIGH overlap, just pick the one with lowest iou_thresh, and discard the other
+                        exclude_box = np.argmin(iou_per_case)
+                        
+                        ### Case 2: anything ABOVE iou thresh is fully deleted
+                        to_del = np.where(iou_per_case > iou_thresh)[0]    
+                        to_del = to_del[to_del != exclude_box]  ### make sure not to delete current box
+                        
+                        del_boxes = box_nums[to_del]
+                        
+                        clean_box_coords[del_boxes] = [[]]
+                        
+                        
+                        ### also ADD coordinates from BOTH boxes to the clean_box_coords at the exclude_box ID
+                        clean_box_coords[box_nums[exclude_box]] = np.unique(np.vstack([case[0], case[1]]), axis=0)
+                        
+                        num_doubs += 1
+                
+                        
+                        
+                clean_box_coords = [x for x in clean_box_coords if x != []]
+                        
+                first_pass_doublets, arr_doublets, box_ids, cc = get_boxes_from_doublets(clean_box_coords)                             
+                
+                
+                sav_doubs = np.moveaxis(first_pass_doublets, -1, 0)
+                sav_doubs = np.asarray(sav_doubs, dtype=np.int32)
+                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_doublets_FP.tif', sav_doubs)
+
+                                
+                
+                
+                ### loop through all doublets and determine iou
                 for case_id, case in enumerate(arr_doublets):
                     
                     if len(case) == 0:
                         continue
                     
                     box_nums = np.asarray(box_ids[case_id])
+
+                    ### Find identical rows that match to overlap region
+                    overlap = cc[case_id - 1]['coords']    ### case_id minus 1 when indexing cc because no region of value zero from above
                     
-                    ### Find identical rows across ALL overlapped regions
                     # matched = case[0]  ### start with first case
                     # for reg in case:
                     #     matched = (reg[:, None] == matched).all(-1).any(-1)
@@ -609,101 +675,67 @@ if __name__=="__main__":
                         
                     
                     ### HACK -- sometimes doesn't match across ALL, so need to just do ANYTHING that matches across any of them for now..
-                    vals, counts = np.unique(np.vstack(case), axis=0, return_counts=True)
-                    matched = vals[counts >= 2]
-                    
-                    
-                        
-                        
+                    # vals, counts = np.unique(np.vstack(case), axis=0, return_counts=True)
+                    # matched = vals[counts >= 2]
+
                     ### Next calculate iou for each individual case
                     iou_per_case = []
                     for reg in case:
-                        intersect = (reg[:, None] == matched).all(-1).any(-1)
+                        intersect = (reg[:, None] == overlap).all(-1).any(-1)
                         intersect = reg[intersect]
                         intersect = len(intersect)
                         
-                        union = len(np.unique(np.vstack([matched, reg]), axis=0))
+                        union = len(np.unique(np.vstack([overlap, reg]), axis=0))
                         
                         iou_per_case.append(intersect/union)
                     iou_per_case = np.asarray(iou_per_case)
-                    print(iou_per_case)
-                    
+
+      
                     """ 3 possible conclusions: 
                                 1) Highest iou gets to keep overlap area (consensus)
                                 2) All other iou above iou threshold (0.7?) is deleted fully
                                 3) All other iou BELOW threshold is kept, but the overlapping coordinates are deleted from the cell
 
-                        """
-                        
-                    ### Case 1: highest iou is kept as overlap area #do nothing
+
+                        """     
+                    ### Case 1: LOWEST iou is kept as overlap area #do nothing
                     exclude_box = np.argmax(iou_per_case)
                     
                     ### Case 2: anything ABOVE iou thresh is fully deleted
-                    to_del = np.where(iou_per_case > iou_thresh)[0]
-                        
-                    del_boxes = box_nums[to_del]
-                    clean_box_coords[del_boxes] = [[]]
+                    # to_del = np.where(iou_per_case > iou_thresh)[0]
+                    # to_del = to_del[to_del != exclude_box]  ### make sure not to delete current box
                     
+                    # del_boxes = box_nums[to_del]
+                    # clean_box_coords[del_boxes] = [[]]
+                    
+                    # other_boxes = np.delete(box_nums, np.concatenate((to_del, [exclude_box])))
                     
                     ### Case 3: anything else that is not fully overlapped (low iou) only has these coords deleted
-                    # other_boxes = np.delete(box_nums, np.concatenate((to_del, [exclude_box])))
-                    # for obox_num in other_boxes:
-                    #     obox = clean_box_coords[obox_num]
+                    other_boxes = np.delete(box_nums, exclude_box)
+                    for obox_num in other_boxes:
+                        obox = clean_box_coords[obox_num]
                         
-                    #     ### HACK if box is empty already
-                    #     if len(obox) == 0: 
-                    #         continue
+                        ### HACK if box is empty already
+                        if len(obox) == 0: 
+                            continue
+                        #all_c = np.concatenate((obox, matched))
                         
-                    #     #all_c = np.concatenate((obox, matched))
+                        not_matched = obox[~(obox[:, None] == overlap).all(-1).any(-1)] ### the only coords that do NOT overlap
                         
-                    #     not_matched = obox[~(obox[:, None] == matched).all(-1).any(-1)] ### the only coords that do NOT overlap
+                        #vals, counts = np.unique(all_c, axis=0, return_counts=True)
                         
-                    #     #vals, counts = np.unique(all_c, axis=0, return_counts=True)
+                        #unique = vals[counts < 2]   ### the only coords that do NOT overlap
                         
-                    #     #unique = vals[counts < 2]   ### the only coords that do NOT overlap
-                        
-                    #     ### Can we also add a way to find the connectivity of the objects at the end here???
-                    #     ### Like, if there's almost no discrete objects left, just delete the whole darn thing?
-                    #     clean_box_coords[obox_num] = not_matched
+                        ### Can we also add a way to find the connectivity of the objects at the end here???
+                        ### Like, if there's almost no discrete objects left, just delete the whole darn thing?
+                        clean_box_coords[obox_num] = not_matched
                                             
-                    
-                    ### WHAT IF THERE ARE REGIONS OVERLAPPED BY only a couple of the multiple cells??? 
-                    
-                    
+                    ### To prevent holes, add the area of the overlap to the box that was excluded from subtraction
+                    clean_box_coords[box_nums[exclude_box]] = np.unique(np.vstack([overlap, clean_box_coords[box_nums[exclude_box]]]), axis=0)
                     
                     
-                    
-                    
-                    """
-                    #unq, count = np.unique(a, axis=0, return_counts=True) ### what do we do if more than one???
-                
-                    ### Case #1: if iou is very close to 1, then just choose larger seg
-                    ### Case #2: if iou is very small...
-                    
-                    ### HACK: just choose largest for now...
-                    all_vols = []
-                    for vol in case:
-                        all_vols.append(len(vol))
-                    
-                    unique_coords = case[np.argmax(all_vols)]
-                    
-
-                    ### or just ALL of the coords to be the same!!! consensus
-                    
-                    ### OR JUST GET AVERAGE SHAPE, and then delete all of the other coords in the main image!!!
-                    
-                    unique_coords = np.vstack(case)
-                    cleaned[unique_coords[:, 2], unique_coords[:, 0], unique_coords[:, 1]] = cell_ids[cell_num]
-                    cell_num += 1
-                    """
-                
-                # cleaned = np.asarray(cleaned, np.int32)
- 
-                # stepwise_clean = np.copy(stepwise_im)
-                # stepwise_clean[cleaned > 0] = 0
-                # #cleaned[cleaned > 0] = cleaned[cleaned > 0] + np.max(stepwise_clean)  ### add to make indices unique
-                
-                # stepwise_clean[cleaned > 0] = cleaned[cleaned > 0]
+                clean_box_coords = [x for x in clean_box_coords if x != []]
+                        
                 
                 stepwise_clean = np.zeros(np.shape(stepwise_im))
                 cell_num = 0
@@ -715,7 +747,7 @@ if __name__=="__main__":
                     cell_num += 1                
                 
                 
-                #stepwise_clean = np.asarray(stepwise_clean, np.int32)
+                stepwise_clean = np.asarray(stepwise_clean, np.int32)
                 tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_cleaned_NEW.tif', stepwise_clean)
 
         

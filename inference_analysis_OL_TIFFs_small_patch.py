@@ -39,7 +39,7 @@ if __name__=="__main__":
             self.dataset_name = "datasets/OL_data"
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/73) dil_group_norm_det_thresh_0_2/'      
 
-            #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/76) dil_group_norm_NEW_DATA_edges_wbc/'                  
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/76) dil_group_norm_NEW_DATA_edges_wbc/'                  
             self.server_env = False
 
 
@@ -155,7 +155,7 @@ if __name__=="__main__":
                 patch_size=128; patch_depth=16
                 
                 ### Define overlap and focal cube to remove cells that fall within this edge
-                overlap_pxy = 14; overlap_pz = 2
+                overlap_pxy = 14; overlap_pz = 3
                 step_xy = patch_size - overlap_pxy * 2
                 step_z = patch_depth - overlap_pz * 2
                 
@@ -411,6 +411,11 @@ if __name__=="__main__":
                                     new_labels = np.zeros(np.shape(label_arr))
                                     for box_id, box_coords in enumerate(merged_coords):
                                     
+                                        ### SOME BOXES GET LOST?
+                                        if len(box_coords) == 0:
+                                            print('BOX WAS FULLY SUBTRACTED')
+                                            continue
+                                            
                                         ### swap axis
                                         box_coords[:, [2, 0]] = box_coords[:, [0, 2]]  
                                         bc = box_coords

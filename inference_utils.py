@@ -100,7 +100,7 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
        #for depth in range(box3d[4], box3d[5] + 1):
           bbox.append(box3d)   ### only get x1, y1, x2, y2
        #    box_depth.append(depth)
-          box_ids.append(box_id)
+          box_ids.append(box_id + 1)  ### cant start from zero!!!
            
     
    
@@ -132,9 +132,6 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
     tmp_boxes = np.zeros(vol_shape)
     list_coords = []
     for b_id, box in enumerate(box_coords):
-        #tmp_boxes[box[0]:box[2], box[1]:box[3]] = tmp_boxes[box[0]:box[2], box[1]:box[3]] + 1
-        no_overlap[box[4]:box[5], box[0]:box[2], box[1]:box[3]] = b_id
-        
         
         a,b,c = np.meshgrid( np.arange(box[4], box[5]), np.arange(box[0], box[2]), np.arange(box[1], box[3]))
         coords = np.vstack(np.vstack(np.transpose([a, b,c])))
@@ -142,7 +139,7 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
         list_coords.append(coords)
         
         
-        no_overlap[coords[:, 0], coords[:, 1], coords[:, 2]] = b_id
+        no_overlap[coords[:, 0], coords[:, 1], coords[:, 2]] = b_id + 1  ### can't start from zero!!!
         tmp_boxes[coords[:, 0], coords[:, 1], coords[:, 2]]  = tmp_boxes[coords[:, 0], coords[:, 1], coords[:, 2]]  + 1
         
  
@@ -155,34 +152,39 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
            val = np.max(tmp_boxes[coords[:, 0], coords[:, 1], coords[:, 2]])
            if val > 1:
                intersect_ids.append(b_id)
-           else:
+           # else:
 
-               df.at[b_id, 'bbox_coords'] = coords
+           #     df.at[b_id, 'bbox_coords'] = coords  ### Unnecessary, because ALL boxes are added at the end with NO exceptions
                   
     
     
     from scipy.spatial import cKDTree
     voronoi_kdtree = cKDTree(centroids)  ### only split centroids of cells with overlap
     
-    check = np.zeros(vol_shape)
+    split_im = np.zeros(vol_shape)
     for b_id in intersect_ids:  
         
         coords = list_coords[b_id]
         test_point_dist, test_point_regions = voronoi_kdtree.query(coords, k=1)
         
-        for idp, p in enumerate(coords):
-            check[p[0], p[1], p[2]] = test_point_regions[idp]
+        split_im[coords[:, 0], coords[:, 1], coords[:, 2]] = test_point_regions + 1  ### can't start from zero!!!
+        
+        #plot_max(split_im); print(b_id)
+        
+        #zzz
+        
+        #for idp, p in enumerate(coords):
+        #    split_im[p[0], p[1], p[2]] = test_point_regions[idp]
 
-    #plot_max(check)
+    #plot_max(split_im)
     
     
-    ### Now set the overlap regions to be of value in check
-    overlap_assigned = np.copy(tmp_boxes)
-    overlap_assigned[tmp_boxes <= 1] = 0
-    overlap_assigned[tmp_boxes > 1] = check[tmp_boxes > 1]
-    #plot_max(overlap_assigned)
-    
-    overlap_assigned[tmp_boxes <= 1] = no_overlap[tmp_boxes <= 1]
+    ### Now set the overlap regions to be of value in split_im
+    overlap_assigned = np.copy(tmp_boxes)                           ### start with the overlap array
+    overlap_assigned[tmp_boxes <= 1] = 0                            ### remove everything that is NOT overlap
+    overlap_assigned[tmp_boxes > 1] = split_im[tmp_boxes > 1]       ### set all overlap regions to have value from split_im array
+
+    overlap_assigned[tmp_boxes <= 1] = no_overlap[tmp_boxes <= 1]   ### Now add in all the rest of the boxes!!! INCLUDING PROPER NUMBER INDEXING
     
     overlap_assigned = np.asarray(overlap_assigned, dtype=int)
     
@@ -191,9 +193,12 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
         plot_max(overlap_assigned)
     
     
-    cc = measure.regionprops(overlap_assigned)
+    cc = measure.regionprops(overlap_assigned, intensity_image=overlap_assigned)
     for b_id, cell in enumerate(cc):
         coords = cell['coords']
+        
+        box_id = cell['max_intensity'] - 1  ### Convert from array value back to index of array which starts from zero!!!
+        
         df.at[b_id, 'bbox_coords'] = coords
 
     return df

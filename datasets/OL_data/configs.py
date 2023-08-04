@@ -424,10 +424,7 @@ class Configs(DefaultConfigs):
         self.min_det_thresh = 0.3
 
         #self.model_max_iou_resolution = 0.1
-
-
-
-
+        
 
         # aggregation method for test and val_patient predictions.
         # wbc = weighted box clustering as in https://arxiv.org/pdf/1811.08661.pdf,
@@ -529,6 +526,9 @@ class Configs(DefaultConfigs):
          # self.learning_rate = [3e-4] * self.num_epochs
           
           # For retinaUNet
+          #self.learning_rate = [3e-4] * self.num_epochs
+          
+          
           self.learning_rate = [3e-4] * self.num_epochs
           
           

@@ -102,6 +102,18 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
        #    box_depth.append(depth)
           box_ids.append(box_id + 1)  ### cant start from zero!!!
            
+
+    y1 = box_coords[:,0]
+    x1 = box_coords[:,1]
+    y2 = box_coords[:,2]
+    x2 = box_coords[:,3]
+
+    areas = (y2 - y1 + 1) * (x2 - x1 + 1)
+    #if dim == 3:
+    z1 = box_coords[:, 4]
+    z2 = box_coords[:, 5]
+    areas *= (z2 - z1 + 1)
+
     
    
 

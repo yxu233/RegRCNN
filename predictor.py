@@ -174,7 +174,12 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
         areas *= (z2 - z1 + 1)
 
     # order is the sorted index.  maps order to index o[1] = 24 (rank1, ix 24)
-    order = scores.argsort()[::-1]
+    #order = scores.argsort()[::-1]
+    
+    order = box_pc_facts.argsort()[::-1]  ### sort in decreasing order by patch factor
+    print('sort by box patch factor')
+    #print(box_pc_facts.argsort()[::-1])
+    
 
     keep_scores = []
     keep_coords = []
@@ -811,6 +816,8 @@ class Predictor:
 
         # True if patient is provided in patches and predictions need to be tiled.
         self.patched_patient = 'patch_crop_coords' in list(batch.keys())
+        
+        print('here')
 
         # forward batch through prediction pipeline.
         results_dict = self.data_aug_forward(batch)
@@ -824,6 +831,8 @@ class Predictor:
                     for name in self.cf.roi_items:
                         gt_box.update({name : batch['patient_'+name][b][t]})
                     results_dict['boxes'][b].append(gt_box)
+
+            
 
             if 'dice' in self.cf.metrics:
                 if self.patched_patient:

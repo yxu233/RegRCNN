@@ -291,7 +291,8 @@ if __name__=="__main__":
             self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/62) SHEM_removed_new_rpn_class_loss_BEST/'
 
 
-
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/87) new_dense_CLEANED_det_thresh_02_min_conf_09/'
+            
 
 
 
@@ -331,7 +332,7 @@ if __name__=="__main__":
     
     
     cf.plot_dir = anal_dir ### TIGER ADDED FOR VAL_GEN
-    val_gen = data_loader.get_train_generators(cf, logger, data_statistics=False)['val_sampling']
+    #val_gen = data_loader.get_train_generators(cf, logger, data_statistics=False)['val_sampling']
     batch_gen = data_loader.get_test_generator(cf, logger)
     #weight_paths = [os.path.join(cf.fold_dir, '{}_best_params.pth'.format(rank)) for rank in
     #                test_predictor.epoch_ranking]
@@ -422,6 +423,9 @@ if __name__=="__main__":
     
         with torch.no_grad():
             batch = batch_gen['test'].generate_train_batch(pid=pid)
+            
+            #zzz
+            
             results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
     
             if 'seg_preds' in results_dict.keys():

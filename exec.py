@@ -30,7 +30,7 @@ import torch
 
 
 ### TIGER ADDED:
-torch.cuda.set_device(1)
+torch.cuda.set_device(0)
 torch.manual_seed(0)   ### for randomly selecting negative samples instead of SHEM
 
 
@@ -257,43 +257,43 @@ def train(cf, logger):
 
 
             #----------- Plot same image each time -------------
-            import numpy as np
-            import tifffile as tiff
-            out_file = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/output_batch/'
-            #loss_int = results_dict['torch_loss'].item() 
+            # import numpy as np
+            # import tifffile as tiff
+            # out_file = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/output_batch/'
+            # #loss_int = results_dict['torch_loss'].item() 
             
-            batch_gen_test = data_loader.get_test_generator(cf, logger)
+            # batch_gen_test = data_loader.get_test_generator(cf, logger)
             
-            pids = batch_gen_test["test"].dataset_pids
+            # pids = batch_gen_test["test"].dataset_pids
             
-            batch = batch_gen_test['test'].generate_train_batch(pid=pids[0])
-            results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
+            # batch = batch_gen_test['test'].generate_train_batch(pid=pids[0])
+            # results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
 
-            if 'seg_preds' in results_dict.keys():
-                results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
+            # if 'seg_preds' in results_dict.keys():
+            #     results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
     
 
-            input_im = np.moveaxis(batch['data'], -1, 1) 
-            truth_im = np.moveaxis(batch['seg'], -1, 1) 
-            seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
+            # input_im = np.moveaxis(batch['data'], -1, 1) 
+            # truth_im = np.moveaxis(batch['seg'], -1, 1) 
+            # seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
             
      
-            inp = np.expand_dims(input_im[0], 0)
-            truth = np.expand_dims(truth_im[0], 0)
-            seg = np.expand_dims(seg_im[0], 0)
+            # inp = np.expand_dims(input_im[0], 0)
+            # truth = np.expand_dims(truth_im[0], 0)
+            # seg = np.expand_dims(seg_im[0], 0)
             
 
-            ### plot concatenated TIFF
-            truth[truth > 0] = 65535
-            seg[seg > 0] = 65535
-            concat  = np.concatenate((inp, np.asarray(truth, dtype=np.uint16), np.asarray(seg, dtype=np.uint16)))
+            # ### plot concatenated TIFF
+            # truth[truth > 0] = 65535
+            # seg[seg > 0] = 65535
+            # concat  = np.concatenate((inp, np.asarray(truth, dtype=np.uint16), np.asarray(seg, dtype=np.uint16)))
 
-            concat = np.moveaxis(concat, 0, 2)       
-            concat = np.moveaxis(concat, 0, 1)                         
+            # concat = np.moveaxis(concat, 0, 2)       
+            # concat = np.moveaxis(concat, 0, 1)                         
 
 
-            tiff.imwrite(out_file + 'VAL_IM_epoch_' + str(epoch) + '_batch_' +  str(0)  + '_COMPOSITE.tif', concat,
-                          imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+            # tiff.imwrite(out_file + 'VAL_IM_epoch_' + str(epoch) + '_batch_' +  str(0)  + '_COMPOSITE.tif', concat,
+            #               imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
          
             
             

@@ -36,7 +36,10 @@ class Configs(DefaultConfigs):
 
         self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy', "cyl1ps_dev")
         self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/MULTI', "cyl1ps_dev")
-        self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data', "")
+        #self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data', "")
+        
+        
+        self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/OL_data', "")
         self.pp_npz_dir = self.pp_rootdir+"_npz"
 
         #self.pre_crop_size = [320,320,8] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
@@ -98,9 +101,9 @@ class Configs(DefaultConfigs):
 
         #self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev'
 
-        self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger'
+        #self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger'
 
-
+        self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/OL_data/Tiger'
 
 
 
@@ -222,7 +225,7 @@ class Configs(DefaultConfigs):
         #############################
         # Colors, Classes, Legends  #
         #############################
-        self.plot_frequency = 4
+        self.plot_frequency = 10
 
         binary_bin_labels = [binLabel(1,  'r<=25',      (*self.green, 1.),      (1,25)),
                              binLabel(2,  'r>25',       (*self.red, 1.),        (25,))]
@@ -361,11 +364,20 @@ class Configs(DefaultConfigs):
         # the former is morge accurate, while the latter is faster (depending on volume size)
         #self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
         
-        self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
+        # self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
+        # if self.val_mode == 'val_patient':
+        #     self.max_val_patients = 220  # if 'all' iterates over entire val_set once.
+        # if self.val_mode == 'val_sampling':
+        #     self.num_val_batches = 35 if self.dim==2 else 25
+
+        ### TIGER - changed to validating ALL samples
+        self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
         if self.val_mode == 'val_patient':
-            self.max_val_patients = 220  # if 'all' iterates over entire val_set once.
+            self.max_val_patients = 'all'  # if 'all' iterates over entire val_set once.
         if self.val_mode == 'val_sampling':
             self.num_val_batches = 35 if self.dim==2 else 25
+
+
 
         self.save_n_models = 2
         self.min_save_thresh = 1 if self.dim == 2 else 1  # =wait time in epochs
@@ -523,7 +535,7 @@ class Configs(DefaultConfigs):
 
       if self.optimizer == 'ADAMW':
           self.weight_decay = 3e-5
-         # self.learning_rate = [3e-4] * self.num_epochs
+          #self.learning_rate = [3e-4] * self.num_epochs
           
           # For retinaUNet
           #self.learning_rate = [3e-4] * self.num_epochs
@@ -860,15 +872,29 @@ class Configs(DefaultConfigs):
       
       ### TIGER - VERY IMPORTANT VALUE HERE... how best to pick this??? Should it be smaller in 2D and larger in 3D?
       
-      self.model_max_instances_per_batch_element = 100 if self.dim == 2 else 800 # per batch element and class
+      self.model_max_instances_per_batch_element = 100 if self.dim == 2 else 400 # per batch element and class
 
       
-      self.detection_nms_threshold = self.model_max_iou_resolution  # needs to be > 0, otherwise all predictions are one cluster.
-      self.model_min_confidence = 0.2  # iou for nms in box refining (directly after heads), should be >0 since ths>=x in mrcnn.py
+      #self.detection_nms_threshold = self.model_max_iou_resolution  # needs to be > 0, otherwise all predictions are one cluster.
+      #self.model_min_confidence = 0.2  # iou for nms in box refining (directly after heads), should be >0 since ths>=x in mrcnn.py
       
       ### FROM REGRCNN   
+      #self.detection_nms_threshold = 0.2  # needs to be > 0, otherwise all predictions are one cluster.
+      
+      #self.detection_nms_threshold = 0.1  # needs to be > 0, otherwise all predictions are one cluster.
+      
+      #self.detection_nms_threshold = 0.2  # needs to be > 0, otherwise all predictions are one cluster.
+      
+      
       self.detection_nms_threshold = 0.2  # needs to be > 0, otherwise all predictions are one cluster.
-      # self.model_min_confidence = 0.1
+      
+      
+      #self.detection_nms_threshold = 0.4  # needs to be > 0, otherwise all predictions are one cluster.
+      
+      
+      #self.model_min_confidence = 0.1  ### was 0.1
+      
+      self.model_min_confidence = 0.9  ### was 0.1
 
 
 

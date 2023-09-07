@@ -278,9 +278,14 @@ def unmold_mask_2D_torch(mask, bbox, image_shape):
 
     Returns a binary mask with the same size as the original image.
     """
+   
+    
     y1, x1, y2, x2 = bbox
     out_zoom = [(y2 - y1).float(), (x2 - x1).float()]
     zoom_factor = [i / j for i, j in zip(out_zoom, mask.shape)]
+    
+    
+
 
     mask = mask.unsqueeze(0).unsqueeze(0)
     mask = torch.nn.functional.interpolate(mask, scale_factor=zoom_factor)
@@ -302,14 +307,67 @@ def unmold_mask_3D(mask, bbox, image_shape):
 
     Returns a binary mask with the same size as the original image.
     """
+    # import matplotlib.pyplot as plt
+    # ma = np.max(mask, axis=0)
+    # plt.figure(); plt.imshow(ma)
+        
+    # #print('in here')
+    # print(mask.shape)
+    
+    ### scale back up?
+    # bbox[0] = bbox[0] + 1
+    # bbox[1] = bbox[1] + 1
+    # bbox[2] = bbox[2] - 1
+    # bbox[3] = bbox[3] - 1
+    # bbox[4] = bbox[4] + 1
+    # bbox[5] = bbox[5] - 1
+    
+    
     y1, x1, y2, x2, z1, z2 = bbox
     out_zoom = [y2 - y1, x2 - x1, z2 - z1]
     zoom_factor = [i/j for i,j in zip(out_zoom, mask.shape)]
+    
+    ### Original interpolation order == 1
     mask = scipy.ndimage.zoom(mask, zoom_factor, order=1).astype(np.float32)
-
+    
+    
+    # print(zoom_factor)
+    # print(bbox)
+    #print(out_zoom)
+    
+    # if len(np.where(out_zoom)[0]) < 3 or len(np.where(np.array(out_zoom) < 0)[0]):  ### means there is a 0 somewhere or non-existent if negative
+    #     full_mask = np.zeros(image_shape[:3])
+    #     return full_mask
+    
+    
+    # print(mask.shape)
+    
+    # import matplotlib.pyplot as plt
+    # ma = np.max(mask, axis=0)
+    # plt.figure(); plt.imshow(ma)
+    
+    ### TIGER swapped to image resize
+    # import skimage
+    # mask = skimage.transform.resize(mask,  out_zoom, order=1)
+    
+    
+    
     # Put the mask in the right location.
     full_mask = np.zeros(image_shape[:3])
     full_mask[y1:y2, x1:x2, z1:z2] = mask
+    
+    
+    
+
+    
+    
+    
+    # print(full_mask.shape)
+    # import matplotlib.pyplot as plt
+    # ma = np.max(full_mask, axis=0)
+    # plt.figure(); plt.imshow(ma)
+    # zzz
+    
     return full_mask
 
 def nms_numpy(box_coords, scores, thresh_nms):

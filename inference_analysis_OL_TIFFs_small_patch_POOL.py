@@ -266,6 +266,11 @@ if __name__=="__main__":
             #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/93) new_CLEANED_det_thresh02_min_thresh_01_groupnorm/'
             
             
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/94) newest_CLEANED_shrunk_det_thresh_02_min_conf_01/'
+            
+            self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/96) new_FOV_data_det_thresh_09_check_300/'
+            
+            
             self.server_env = False
 
 
@@ -301,7 +306,7 @@ if __name__=="__main__":
 
     starting_epoch = 1
     #if cf.resume:
-    last_check = 0
+    last_check = 1
     
 
     
@@ -375,7 +380,7 @@ if __name__=="__main__":
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
         foldername = input_path.split('/')[-2]
-        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_92_best335'
+        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_96_last300_skimage_COLORED_step3_threshfixed'
     
         """ For testing ILASTIK images """
         images = glob.glob(os.path.join(input_path,'*.tif'))    # can switch this to "*truth.tif" if there is no name for "input"
@@ -448,6 +453,8 @@ if __name__=="__main__":
                 ### Define empty items
                 box_coords_all = []; total_blocks = 0;
                 segmentation = np.zeros([depth_im, width, height])
+                colored_im = np.zeros([depth_im, width, height])
+                
                 split_seg = np.zeros([depth_im, width, height])
                 all_xyz = [] 
                 
@@ -461,8 +468,8 @@ if __name__=="__main__":
                 
                 
                 ### SET THE STEP SIZE TO BE HALF OF THE IMAGE SIZE
-                step_z = patch_depth/2
-                step_xy = patch_size/2
+                #step_z = patch_depth/2
+                #step_xy = patch_size/2
                 
                 
                 
@@ -517,7 +524,7 @@ if __name__=="__main__":
                                    
                                    """ """
                                    ### run MaskRCNN   ### likely with NMS pooling
-                                   
+                                   #zzz
                                    output = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
                                    
                                    
@@ -530,6 +537,7 @@ if __name__=="__main__":
                                    #new['boxes'] = []
                                    
                                    ### Add box patch factor
+                                   new_box_list = []
                                    for bid, box in enumerate(output['boxes'][0]):
                                        
                                       #box_centers = box_coords
@@ -544,14 +552,24 @@ if __name__=="__main__":
                                                          zip(box_centers, np.array(quad_intensity[0][0].shape) / 2)])
       
                                        
-                                       box['box_patch_center_factor' ] = factor
+                                       box['box_patch_center_factor'] = factor
                                        
                                        
-                                       
-                                       output['boxes'][0][bid] = box
-                                       
-
+                                       ### Only add if above threshold
+                                       if box['box_score'] > thresh:
+                                           new_box_list.append(box)     
+                                           
+                                        
+                                       ### Some bounding boxes have no associated segmentation? Also skip
+                                       if len(box['mask_coords']) == 0:
+                                           #print(box)
+                                           continue
+                                           
+                                           
+                                           
                                    
+                                   output['boxes'] = [new_box_list]
+                                   #zzz
                                    ### DEBUG: make fake norm pdf
                                    # all_pdf = np.transpose(np.where(quad_intensity[0][0] > -1))
                                    
@@ -597,25 +615,30 @@ if __name__=="__main__":
     
                                    if 'seg_preds' in results_dict.keys():
                                         results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
-                                        
+                                        results_dict['colored_boxes'] = np.expand_dims(results_dict['colored_boxes'][:, 1, :, :, :], axis=0)
                                         
                                    ### Add to segmentation
                                    seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
+                                   
+                                   color_im = np.moveaxis(results_dict['colored_boxes'], -1, 1) 
                                    segmentation[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] = segmentation[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] + seg_im[0, :, 0, :, :]
-                                    
+                                   colored_im[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] = color_im[0, :, 0, :, :]
                                    
                                    for bs in range(batch_size):
     
                                        box_df = results_dict['boxes'][bs]
                                        box_vert = []
                                        box_score = []
+                                       mask_coords = []
                                        for box in box_df:
-                                           if box['box_score'] > thresh:
+                                          
                                                box_vert.append(box['box_coords'])
                                                box_score.append(box['box_score'])
-                                               
-                                           #else:
-                                               #print(box['box_score'])
+                                               mask_coords.append(box['mask_coords'])
+                                               #zzz
+                                               if box['box_score'] < thresh:
+                                                   #print('error thresh')
+                                                   zzz
                                                
                                                
                                                
@@ -630,8 +653,13 @@ if __name__=="__main__":
 
                     
                                        all_patches.append({'box_vert':box_vert, 'results_dict': results_dict, 'patch_im': patch_im, 'total_blocks': bs % total_blocks + (total_blocks - batch_size), 
-                                                            'focal_cube':focal_cube, 'xyz':batch_xyz[bs]})
+                                                            'focal_cube':focal_cube, 'xyz':batch_xyz[bs], 'mask_coords':mask_coords})
                                        
+                                   ### Plot color image to see extent of overlap
+                                   # tmp_im = np.zeros(np.shape(patch_im))
+                                       
+                                   # for mask_c in mask_coords:
+                                   #     tmp_im[mask_c[:, 2], mask_c[:, 0], mask_c[:, 1]] = tmp_im[mask_c[:, 2], mask_c[:, 0], mask_c[:, 1]] + 1
                                        
                                        
                                        
@@ -658,13 +686,18 @@ if __name__=="__main__":
                                    # if z > 30:
                                    #     zzz
  
-
+                #zzz
                 filename = input_name.split('/')[-1].split('.')[0:-1]
                 filename = '.'.join(filename)
                 
                 
                 segmentation = np.asarray(segmentation, np.int32)
                 tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_segmentation_overlap3.tif', segmentation)
+
+
+                colored_im = np.asarray(colored_im, np.int32)
+                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_colored_im.tif', colored_im)
+                
                 
                 plot_max(segmentation)
            
@@ -693,15 +726,31 @@ if __name__=="__main__":
                         
                         c = box['box_coords']
                         
-                        box_centers = [(c[ii] + c[ii + 2]) / 2 for ii in range(2)]
+                        #box_centers = [(c[ii] + c[ii + 2]) / 2 for ii in range(2)]
                         
                         
+                        box_centers = []                        
+                        
+                        x_val = round((c[0] + c[2]) / 2)
+                        if x_val >= patch_depth:
+                            x_val = patch_depth - 1
+                        box_centers.append(x_val)   
+                        
+                        
+                        y_val = round((c[1] + c[3]) / 2)
+                        if y_val >= patch_depth:
+                            y_val = patch_depth - 1
+                        box_centers.append(y_val)   
+
                         z_val = round((c[4] + c[5]) / 2)
                         if z_val >= patch_depth:
                             z_val = patch_depth - 1
-                        box_centers.append(z_val)                        
-                        
-                        
+                        box_centers.append(z_val)  
+
+
+
+
+
                         ### Add exclusion by focal_cube
                         box_centers = np.asarray(np.round(box_centers), dtype=int)
                         val = focal_cube[box_centers[0], box_centers[1], box_centers[2]]
@@ -724,6 +773,8 @@ if __name__=="__main__":
                         
                         box['patch_id'] = '0_0'
                         
+                        
+                        
                         #results['boxes'][0][idb] = box
                         
                         if val == 0:
@@ -731,12 +782,17 @@ if __name__=="__main__":
                             pool_for_wbc.append(box)
                         
                         else:
-                            exclude_edge.append(box)
+                            exclude_edge.append(box)   ### not needed if have overlap == 50%
                         
                         
                         
                         
-                        
+                input_im = np.expand_dims(input_im, axis=0)
+                input_im = np.expand_dims(input_im, axis=2)
+                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_input_im.tif', np.asarray(input_im, dtype=np.uint16),
+                                      imagej=True, #resolution=(1/XY_res, 1/XY_res),
+                                      metadata={'spacing':1, 'unit': 'um', 'axes': 'TZCYX'})  
+                                        
                         
                         
                         
@@ -754,7 +810,7 @@ if __name__=="__main__":
                 patch_depth = patch_im.shape[0]
                 patch_size = patch_im.shape[1]
             
-            
+                #zzz
                 box_vert = []
                 for box in out[0]:
                     box_vert.append(box['box_coords'])
@@ -763,11 +819,16 @@ if __name__=="__main__":
                 
                 
                 seg_overall = np.copy(segmentation)
-                seg_overall[seg_overall > 0] = 1
+                
+                
+                #%% Since there's so much overlap, go by consensus, only keep seg > 2
+                # seg_overall[seg_overall <= 2] = 0
+                
+                # seg_overall[seg_overall > 0] = 1
                 
                 #label_arr = np.copy(results_dict['seg_preds'],)
                 
-            
+                #zz
             
                 df_cleaned = split_boxes_by_Voronoi3D(box_vert, vol_shape = seg_overall.shape)
                 merged_coords = df_cleaned['bbox_coords'].values
@@ -800,7 +861,7 @@ if __name__=="__main__":
 
 
                 new_labels = np.asarray(new_labels, np.int32)
-                #tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_labels_BOXES_02.tif', new_labels)
+                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_labels_BOXES_02_SHRUNK.tif', new_labels)
                 
             
                 new_labels[seg_overall == 0] = 0   ### This is way simpler and faster than old method of looping through each detection
@@ -917,14 +978,12 @@ if __name__=="__main__":
                 ### Expand each to_assign to become a neighborhood!  ### OR JUST DILATE THE WHOLE IMAGE?
                 clean_labels = np.copy(new_labels)
                 clean_labels[to_assign > 0] = 0
-                
-       
 
                 clean_labels = expand_add_stragglers(to_assign, clean_labels)
                 tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_ass_step1.tif', clean_labels)                
                 
                 
-                ### Expand each leftover segmentation piece to be a part of the neighborhood!
+                #%% ## Expand each leftover segmentation piece to be a part of the neighborhood!
                 bw_seg = np.copy(segmentation)
                 bw_seg[bw_seg > 0] = 1
                 bw_seg[clean_labels > 0] = 0
@@ -935,7 +994,7 @@ if __name__=="__main__":
                 tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_ass_step2.tif', clean_labels)                      
                 
                 
-                ### Also clean up small objects and add them to nearest object that is large
+                #%% ## Also clean up small objects and add them to nearest object that is large
                 min_size = 80
                 
                 all_obj = measure.regionprops(clean_labels)
@@ -963,7 +1022,7 @@ if __name__=="__main__":
                 
                 
 
-                ### Also go through Z-slices and remove any super thin sections in XY? Like < 10 pixels
+                #%% ## Also go through Z-slices and remove any super thin sections in XY? Like < 10 pixels
                 count = 0
                 for zid, zslice in enumerate(clean_labels):
                     
@@ -990,7 +1049,7 @@ if __name__=="__main__":
                                       # all_patches.append({'box_vert':box_vert, 'results_dict': results_dict, 'patch_im': patch_im, 'total_blocks': bs % total_blocks + (total_blocks - batch_size), 
                                       #                      'focal_cube':focal_cube, 'xyz':batch_xyz[bs]})
 
-                
+                #zzz 
                 
                 """ Clean up all df to extract factors per box, and then use k-nearest neighbor to get best matches 
                 
@@ -1140,12 +1199,7 @@ if __name__=="__main__":
                 # #zzz
 
                 #input_im = np.asarray(input_im, np.uint8)
-                input_im = np.expand_dims(input_im, axis=0)
-                input_im = np.expand_dims(input_im, axis=2)
-                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_input_im.tif', np.asarray(input_im, dtype=np.uint16),
-                                      imagej=True, #resolution=(1/XY_res, 1/XY_res),
-                                      metadata={'spacing':1, 'unit': 'um', 'axes': 'TZCYX'})  
-                
+
                 #zzz
 
 ###########################################################################################        

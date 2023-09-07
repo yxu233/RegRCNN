@@ -36,10 +36,10 @@ class Configs(DefaultConfigs):
 
         self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy', "cyl1ps_dev")
         self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/MULTI', "cyl1ps_dev")
-        #self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data', "")
+        self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data', "")
         
         
-        self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/OL_data', "")
+        #self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/OL_data', "")
         self.pp_npz_dir = self.pp_rootdir+"_npz"
 
         #self.pre_crop_size = [320,320,8] #y,x,z; determines pp data shape (2D easily implementable, but only 3D for now)
@@ -101,9 +101,9 @@ class Configs(DefaultConfigs):
 
         #self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/RegRCNN_maskrcnn_testing/toy/cyl1ps_dev'
 
-        #self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger'
+        self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger'
 
-        self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/OL_data/Tiger'
+        #self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/OL_data/Tiger'
 
 
 
@@ -337,7 +337,7 @@ class Configs(DefaultConfigs):
             'do_elastic_deform': False,
             'alpha': (0., 1500.),
             'sigma': (30., 50.),
-            'do_rotation': True,   ### Tiger changed to True
+            'do_rotation': False,   ### Tiger changed to True
             'angle_x': (0., 2 * np.pi),
             'angle_y': (0., 0),
             'angle_z': (0., 0),
@@ -388,7 +388,13 @@ class Configs(DefaultConfigs):
             self.model_selection_criteria.update({name + "_avp": 0.8 for name in self.class_dict.values()})
 
         self.lr_decay_factor = 0.25
-        self.scheduling_patience = np.ceil(3600 / (self.num_train_batches * self.batch_size))
+        #self.scheduling_patience = np.ceil(3600 / (self.num_train_batches * self.batch_size))
+        
+        
+        
+        self.scheduling_patience = 40   ### Tiger changed to wait 40 epochs before making a shift in lr
+        
+        
         #self.weight_decay = 3e-5
         
         
@@ -872,7 +878,7 @@ class Configs(DefaultConfigs):
       
       ### TIGER - VERY IMPORTANT VALUE HERE... how best to pick this??? Should it be smaller in 2D and larger in 3D?
       
-      self.model_max_instances_per_batch_element = 100 if self.dim == 2 else 400 # per batch element and class
+      self.model_max_instances_per_batch_element = 100 if self.dim == 2 else 300 # per batch element and class
 
       
       #self.detection_nms_threshold = self.model_max_iou_resolution  # needs to be > 0, otherwise all predictions are one cluster.

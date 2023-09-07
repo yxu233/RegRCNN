@@ -145,7 +145,22 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
     list_coords = []
     for b_id, box in enumerate(box_coords):
         
-        a,b,c = np.meshgrid( np.arange(box[4], box[5]), np.arange(box[0], box[2]), np.arange(box[1], box[3]))
+        a,b,c = np.meshgrid(np.arange(box[4], box[5]), np.arange(box[0], box[2]), np.arange(box[1], box[3]))
+        
+        
+        ### TIGER UPDATE - shrink bounding boxes because they are expanded!!!
+        # z_r = np.arange(box[4] + 1, box[5] - 1)
+        # if len(z_r) == 0: z_r = box[4] + 1
+        
+        # x_r = np.arange(box[0] + 1, box[2] - 1)
+        # if len(x_r) == 0: x_r = box[0] + 1        
+        
+        # y_r = np.arange(box[1] + 1, box[3] - 1)
+        # if len(y_r) == 0: y_r = box[3] + 1        
+        
+        # a,b,c = np.meshgrid(z_r, x_r, y_r)
+        
+        
         coords = np.vstack(np.vstack(np.transpose([a, b,c])))
                        
         list_coords.append(coords)
@@ -155,10 +170,7 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
         tmp_boxes[coords[:, 0], coords[:, 1], coords[:, 2]]  = tmp_boxes[coords[:, 0], coords[:, 1], coords[:, 2]]  + 1
         
  
-  
-    # vor = Voronoi(centroids)
-    # lines = [shapely.geometry.LineString(vor.vertices[line]) for line in 
-    #     vor.ridge_vertices if -1 not in line]
+
     intersect_ids = []
     for b_id, coords in enumerate(list_coords):
            val = np.max(tmp_boxes[coords[:, 0], coords[:, 1], coords[:, 2]])
@@ -203,6 +215,9 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
     if debug:
         plot_max(no_overlap)
         plot_max(overlap_assigned)
+        
+        plt.figure(); plt.imshow(no_overlap[20])
+        plt.figure(); plt.imshow(overlap_assigned[20])
     
     
     cc = measure.regionprops(overlap_assigned, intensity_image=overlap_assigned)

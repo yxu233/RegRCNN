@@ -93,7 +93,7 @@ def apply_wbc_to_patient(inputs):
                                  predictions, and a dummy batch dimension of 1 for 3D predictions.
     :return. pid: string. patient id.
     """
-    regress_flag, in_patient_results_list, pid, class_dict, clustering_iou, n_ens = inputs
+    regress_flag, in_patient_results_list, pid, class_dict, thresh, n_ens = inputs
     out_patient_results_list = [[] for _ in range(len(in_patient_results_list))]
 
     for bix, b in enumerate(in_patient_results_list):
@@ -103,21 +103,23 @@ def apply_wbc_to_patient(inputs):
             boxes = [(ix, box) for ix, box in enumerate(b) if
                      (box['box_type'] == 'det' and box['box_pred_class_id'] == cl)]
             box_coords = np.array([b[1]['box_coords'] for b in boxes])
-            box_scores = np.array([b[1]['box_score'] for b in boxes])
-            box_center_factor = np.array([b[1]['box_patch_center_factor'] for b in boxes])
-            box_n_overlaps = np.array([b[1]['box_n_overlaps'] for b in boxes])
+            scores = np.array([b[1]['box_score'] for b in boxes])
+            box_pc_facts = np.array([b[1]['box_patch_center_factor'] for b in boxes])
+            box_n_ovs = np.array([b[1]['box_n_overlaps'] for b in boxes])
             try:
                 box_patch_id = np.array([b[1]['patch_id'] for b in boxes])
             except KeyError: #backward compatibility for already saved pred results ... omg
                 box_patch_id = np.array([b[1]['ens_ix'] for b in boxes])
-            box_regressions = np.array([b[1]['regression'] for b in boxes]) if regress_flag else None
+            box_regress = np.array([b[1]['regression'] for b in boxes]) if regress_flag else None
             box_rg_bins = np.array([b[1]['rg_bin'] if 'rg_bin' in b[1].keys() else float('NaN') for b in boxes])
             box_rg_uncs = np.array([b[1]['rg_uncertainty'] if 'rg_uncertainty' in b[1].keys() else float('NaN') for b in boxes])
+            
+  
 
-            if 0 not in box_scores.shape:
+            if 0 not in scores.shape:
                 keep_scores, keep_coords, keep_n_missing, keep_regressions, keep_rg_bins, keep_rg_uncs = \
-                    weighted_box_clustering(box_coords, box_scores, box_center_factor, box_n_overlaps, box_rg_bins, box_rg_uncs,
-                                             box_regressions, box_patch_id, clustering_iou, n_ens)
+                    weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_bins, box_rg_uncs,
+                                             box_regress, box_patch_id, thresh, n_ens)
 
 
                 for boxix in range(len(keep_scores)):
@@ -211,6 +213,7 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
         assert np.all(ovr==ovr_fl), "ovr {}\n ovr_float {}".format(ovr, ovr_fl)
         # get all the predictions that match the current box to build one cluster.
         matches = np.nonzero(ovr > thresh)[0]
+        
 
         match_n_ovs = box_n_ovs[order[matches]]
         match_pc_facts = box_pc_facts[order[matches]]

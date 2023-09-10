@@ -30,7 +30,7 @@ import torch
 
 
 ### TIGER ADDED:
-torch.cuda.set_device(0)
+torch.cuda.set_device(1)
 torch.manual_seed(0)   ### for randomly selecting negative samples instead of SHEM
 
 
@@ -351,11 +351,11 @@ if __name__ == '__main__':
     ### FOR OLIGO TRAINING    
     parser.add_argument('--dataset_name', type=str, default='OL_data',
                         help="path to the dataset-specific code in source_dir/datasets")
-    #parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/',
-    #                     help='path to experiment dir. will be created if non existent.')
+    parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/',
+                         help='path to experiment dir. will be created if non existent.')
     
-    parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/',
-                        help='path to experiment dir. will be created if non existent.')
+    #parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/',
+    #                    help='path to experiment dir. will be created if non existent.')
     
         
     

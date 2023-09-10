@@ -38,7 +38,12 @@ def expand_add_stragglers(to_assign, clean_labels):
         
         coords = ass['coords']
 
-        exp = expand_coord_to_neighborhood(coords, lower=1, upper=1)
+
+        match = to_assign[coords[:, 0], coords[:, 1], coords[:, 2]]
+        vals = np.unique(match)
+        
+
+        exp = expand_coord_to_neighborhood(coords, lower=1, upper=1 + 1)   ### always need +1 because of python indexing
         exp = np.vstack(exp)
 
         values = clean_labels[exp[:, 0], exp[:, 1], exp[:, 2]]
@@ -380,7 +385,7 @@ if __name__=="__main__":
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
         foldername = input_path.split('/')[-2]
-        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_96_last300_skimage_COLORED_step3_threshfixed'
+        sav_dir = input_path + '/' + foldername + '_output_PYTORCH_96_last300_skimage_COLORED_step3_thresh09_NOfoc_fixed_neighborhoods'
     
         """ For testing ILASTIK images """
         images = glob.glob(os.path.join(input_path,'*.tif'))    # can switch this to "*truth.tif" if there is no name for "input"
@@ -421,7 +426,7 @@ if __name__=="__main__":
                 focal_cube[overlap_pz:-overlap_pz, overlap_pxy:-overlap_pxy, overlap_pxy:-overlap_pxy] = 0                
                 focal_cube = np.moveaxis(focal_cube, 0, -1)
 
-                thresh = 0.99
+                thresh = 0.9
                 
                 #thresh = 0.9
                 cf.merge_3D_iou = thresh
@@ -538,11 +543,33 @@ if __name__=="__main__":
                                    
                                    ### Add box patch factor
                                    new_box_list = []
+                                   tmp_check = np.zeros(np.shape(quad_intensity[0][0]))
                                    for bid, box in enumerate(output['boxes'][0]):
                                        
-                                      #box_centers = box_coords
+                                       #box_centers = box_coords
                                        
                                        c = box['box_coords']
+                                       
+                                       #tmp_check[c[0]:c[2], c[1]:c[3], c[4]:c[5]] = 2 
+                                       """ 
+                                       
+                                       
+                                           Some bounding boxes have no associated segmentations!!! Skip these
+                                       
+                                       
+                                       
+                                       """
+                                       if len(box['mask_coords']) == 0:
+                                           #print(box)
+                                           #zzz
+                                           continue
+                                       
+                                       #else:
+                                       #    tmp_check[c[0]:c[2], c[1]:c[3], c[4]:c[5]] = 1 
+                                       
+                                        
+                                       
+                                       
                                        box_centers = [(c[ii] + c[ii + 2]) / 2 for ii in range(2)]
                                       #if self.cf.dim == 3:
                                        box_centers.append((c[4] + c[5]) / 2)
@@ -560,10 +587,7 @@ if __name__=="__main__":
                                            new_box_list.append(box)     
                                            
                                         
-                                       ### Some bounding boxes have no associated segmentation? Also skip
-                                       if len(box['mask_coords']) == 0:
-                                           #print(box)
-                                           continue
+
                                            
                                            
                                            
@@ -701,7 +725,10 @@ if __name__=="__main__":
                 
                 plot_max(segmentation)
            
+                
 
+ 
+                #%% For bounding box approach
                 # p = Pool(8)
 
                 # all_df = p.map(post_process_boxes, all_patches)
@@ -764,6 +791,13 @@ if __name__=="__main__":
                         c[5] = c[5] + xyz[2]
                         
                         
+ 
+                        coords = np.copy(box['mask_coords']) 
+                        coords[:, 0] = coords[:, 0] + xyz[0]
+                        coords[:, 1] = coords[:, 1] + xyz[1]                             
+                        coords[:, 2] = coords[:, 2] + xyz[2]
+ 
+    
                         #if c[5] > 200:
                         #    zzz
                         
@@ -773,16 +807,18 @@ if __name__=="__main__":
                         
                         box['patch_id'] = '0_0'
                         
+                        box['mask_coords'] = coords
+                        
                         
                         
                         #results['boxes'][0][idb] = box
+                        pool_for_wbc.append(box)
+                        # if val == 0:
                         
-                        if val == 0:
+                        #     pool_for_wbc.append(box)
                         
-                            pool_for_wbc.append(box)
-                        
-                        else:
-                            exclude_edge.append(box)   ### not needed if have overlap == 50%
+                        # else:
+                        #     exclude_edge.append(box)   ### not needed if have overlap == 50%
                         
                         
                         
@@ -806,6 +842,28 @@ if __name__=="__main__":
                 
                 #results_dict = output
                 
+                
+                
+                #%% Get masks directly without any other postprocessing from maskrcnn outputs -- will have overlaps!!!
+                box_masks = []
+                for box in out[0]:
+                    box_masks.append(box['mask_coords'])
+            
+                box_masks = np.asarray(box_masks[0])
+                
+                tmp = np.zeros(np.shape(segmentation))
+                tmp_overlap = np.zeros(np.shape(segmentation))
+                for m_id, mask in enumerate(box_masks):
+                    tmp[mask[:, 2], mask[:, 0], mask[:, 1]] = m_id + 1
+                    tmp_overlap[mask[:, 2], mask[:, 0], mask[:, 1]]  = tmp_overlap[mask[:, 2], mask[:, 0], mask[:, 1]] + 1
+                
+                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'tmp.tif', np.asarray(tmp, dtype=np.int32))        
+                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'tmp_overlap.tif', np.asarray(tmp_overlap, dtype=np.int32))        
+                
+                #zzz
+                
+                
+                #%% For KNN based assignment of voxels to split boxes
 
                 patch_depth = patch_im.shape[0]
                 patch_size = patch_im.shape[1]
@@ -995,6 +1053,9 @@ if __name__=="__main__":
                 
                 
                 #%% ## Also clean up small objects and add them to nearest object that is large
+                
+                #zzz
+                
                 min_size = 80
                 
                 all_obj = measure.regionprops(clean_labels)
@@ -1014,6 +1075,15 @@ if __name__=="__main__":
                 clean_labels[small > 0] = 0   ### must remember to mask out all the small areas otherwise will get reassociated back with the small area!
 
                 clean_labels = expand_add_stragglers(small, clean_labels)
+
+
+                ### Add back in all the small objects that were NOT near enough to touch anything else
+                small[clean_labels > 0] = 0
+                
+                clean_labels[small > 0] = small[small > 0]
+
+
+
 
                 tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_ass_step3_FOCAL.tif', clean_labels)                      
                 
@@ -1040,6 +1110,18 @@ if __name__=="__main__":
                 
                 ### Also remove super large objects?
                 
+                
+                
+                
+                #%% Pad entire image and shift by 1 to the right and 1 down?
+                shift_im = np.zeros([depth_im + 1, width + 1, height + 1])
+                
+                shift_im[1:, 1:, 1:] = clean_labels
+                
+                shifted = shift_im[:-1, :-1, :-1]
+                
+                shifted = np.asarray(shifted, np.int32)
+                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_shfited.tif', shifted)    
                 
                 
                 

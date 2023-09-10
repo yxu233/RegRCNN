@@ -478,6 +478,7 @@ def expand_coord_to_neighborhood(coords, lower, upper):
                 for z in range(-lower, upper):
                     new_idx = [idx[0] + x, idx[1] + y, idx[2] + z]
                     neighborhood_be.append(new_idx)    
+                    
     return neighborhood_be
 
 

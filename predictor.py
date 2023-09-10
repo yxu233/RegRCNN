@@ -114,18 +114,23 @@ def apply_wbc_to_patient(inputs):
             box_rg_bins = np.array([b[1]['rg_bin'] if 'rg_bin' in b[1].keys() else float('NaN') for b in boxes])
             box_rg_uncs = np.array([b[1]['rg_uncertainty'] if 'rg_uncertainty' in b[1].keys() else float('NaN') for b in boxes])
             
-  
+            
+            box_masks = np.array([b[1]['mask_coords'] for b in boxes])
+            
+            #zzz
+            
 
             if 0 not in scores.shape:
-                keep_scores, keep_coords, keep_n_missing, keep_regressions, keep_rg_bins, keep_rg_uncs = \
+                keep_scores, keep_coords, keep_n_missing, keep_regressions, keep_rg_bins, keep_rg_uncs, keep_masks = \
                     weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_bins, box_rg_uncs,
-                                             box_regress, box_patch_id, thresh, n_ens)
+                                             box_regress, box_patch_id, thresh, n_ens,
+                                             box_masks)
 
 
                 for boxix in range(len(keep_scores)):
                     clustered_box = {'box_type': 'det', 'box_coords': keep_coords[boxix],
                                      'box_score': keep_scores[boxix], 'cluster_n_missing': keep_n_missing[boxix],
-                                     'box_pred_class_id': cl}
+                                     'box_pred_class_id': cl, 'mask_coords':keep_masks}
                     if regress_flag:
                         clustered_box.update({'regression': keep_regressions[boxix],
                                               'rg_uncertainty': keep_rg_uncs[boxix],
@@ -140,7 +145,7 @@ def apply_wbc_to_patient(inputs):
 
 
 def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_bins, box_rg_uncs,
-                             box_regress, box_patch_id, thresh, n_ens):
+                             box_regress, box_patch_id, thresh, n_ens, box_masks):
     """Consolidates overlapping predictions resulting from patch overlaps, test data augmentations and temporal ensembling.
     clusters predictions together with iou > thresh (like in NMS). Output score and coordinate for one cluster are the
     average weighted by individual patch center factors (how trustworthy is this candidate measured by how centered
@@ -189,6 +194,7 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
     keep_regress = []
     keep_rg_bins = []
     keep_rg_uncs = []
+    keep_masks = []
 
     while order.size > 0:
         i = order[0]  # highest scoring element
@@ -214,6 +220,10 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
         # get all the predictions that match the current box to build one cluster.
         matches = np.nonzero(ovr > thresh)[0]
         
+        # if len(matches) > 1:
+        #     zzz
+
+
 
         match_n_ovs = box_n_ovs[order[matches]]
         match_pc_facts = box_pc_facts[order[matches]]
@@ -221,6 +231,28 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
         match_ov_facts = ovr[matches]
         match_areas = areas[order[matches]]
         match_scores = scores[order[matches]]
+        
+        
+        ### FIND AVERAGE MASK
+        match_masks = box_masks[order[matches]]
+        intersect = np.vstack(match_masks)
+        
+        intersect = np.unique(intersect, axis=0)
+        
+        # tmp = np.zeros(np.shape(segmentation))
+        # for m_id, mask in enumerate(match_masks):
+        #     tmp[mask[:, 2], mask[:, 0], mask[:, 1]] = m_id + 1
+        
+        # tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'tmp.tif', tmp)        
+        
+        
+        # for reg in case:
+        #     intersect = (reg[:, None] == overlap).all(-1).any(-1)
+        #     intersect = reg[intersect]
+        #     intersect = len(intersect)
+
+
+
 
         # weight all scores in cluster by patch factors, and size.
         match_score_weights = match_ov_facts * match_areas * match_pc_facts
@@ -273,6 +305,7 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
             keep_regress.append(avg_regress)
             keep_rg_uncs.append(avg_rg_uncs)
             keep_rg_bins.append(avg_rg_bins)
+            keep_masks.append(intersect)
 
         # get index of all elements that were not matched and discard all others.
         inds = np.nonzero(ovr <= thresh)[0]
@@ -280,7 +313,7 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
         assert np.all(inds == inds_where), "inds_nonzero {} \ninds_where {}".format(inds, inds_where)
         order = order[inds]
 
-    return keep_scores, keep_coords, keep_n_missing, keep_regress, keep_rg_bins, keep_rg_uncs
+    return keep_scores, keep_coords, keep_n_missing, keep_regress, keep_rg_bins, keep_rg_uncs, keep_masks
 
 
 def apply_nms_to_patient(inputs):

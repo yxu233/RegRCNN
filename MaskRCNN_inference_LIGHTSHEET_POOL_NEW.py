@@ -35,6 +35,9 @@ from scipy.stats import norm
 from functional.matlab_crop_function import *
 from functional.tree_functions import *  
 
+from predictor import *
+import time
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 

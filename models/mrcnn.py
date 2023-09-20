@@ -162,12 +162,6 @@ class Mask(nn.Module):
             self.deconv = nn.ConvTranspose2d(cf.end_filts, cf.end_filts, kernel_size=2, stride=2) # todo why no norm here?
         else:
             self.deconv = nn.ConvTranspose3d(cf.end_filts, cf.end_filts, kernel_size=2, stride=2)
-            
-            
-
-        
-        
-        
 
         self.relu = nn.ReLU(inplace=True) if cf.relu == 'relu' else nn.LeakyReLU(inplace=True)
         self.conv5 = conv(cf.end_filts, cf.head_classes, ks=1, stride=1, relu=None)
@@ -182,36 +176,11 @@ class Mask(nn.Module):
         :return: x: masks (n_sampled_proposals (n_detections in inference), n_classes, y, x, (z))
         """
         x = mutils.pyramid_roi_align(x, rois, self.pool_size, self.pyramid_levels, self.dim)
-        
-       # print('SHAPES OF THIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIINGS')
-        #print(x.shape)
-        
         x = self.conv1(x)
-        
-        #print(x.shape)
-
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
-
-        #print(x.shape)
         x = self.relu(self.deconv(x))
-        
-        #print(x.shape)
-        #zzz
-        
-        
-        #%% ## ADD ANOTHER CONVTRANSPOSE HERE IF WANT TO DO LARGER MINI_MASK SHAPE
-            
-        ### WHAT IS THE SHAPE OF each conv after the padding??? Is this throwing it off because padding is not "SAME"???    
-        x = self.relu(self.deconv(x))    
-        
-        #print(x.shape)
-        
-        #zzz
-        
-        
-
         x = self.conv5(x)
         x = self.sigmoid(x)
         return x
@@ -818,7 +787,6 @@ class net(nn.Module):
         return [sample_deltas, sample_mask, sample_logits, sample_regressions, sample_proposals,
                 sample_target_deltas, sample_target_mask, sample_target_class_ids, sample_target_regressions]
 
-
     def get_results(self, img_shape, detections, detection_masks, box_results_list=None, return_masks=True):
         """
         Restores batch dimension of merged detections, unmolds detections, creates and fills results dict.
@@ -852,7 +820,7 @@ class net(nn.Module):
             box_results_list =  [[] for _ in range(img_shape[0])]
         # seg_logits == seg_probs in mrcnn since mask head finishes with sigmoid (--> image space = [0,1])
         seg_probs = []
-        all_colored = []
+        #all_colored = []
         # loop over batch and unmold detections.
         for ix in range(img_shape[0]):
 
@@ -860,7 +828,7 @@ class net(nn.Module):
             final_masks = np.zeros((self.cf.num_classes + 1, *img_shape[2:]))
             
             ### TIGER ADDED:
-            colored_masks = np.zeros((self.cf.num_classes + 1, *img_shape[2:]))
+            #colored_masks = np.zeros((self.cf.num_classes + 1, *img_shape[2:]))
             
             #+1 for bg, 0.5 bc mask head classifies only bg/fg with logits between 0,1--> bg is <0.5
             if self.cf.num_classes + 1 != self.cf.num_seg_classes:
@@ -905,21 +873,18 @@ class net(nn.Module):
                         final_masks[class_ids[i]] = np.max((final_masks[class_ids[i]], full_mask), axis=0)
                         
                         
-                        """ Tiger added ability to extract mask information
+                        # color = np.copy(full_mask)
+                        # color[full_mask > 0.49999] = i
+                        # color[full_mask <= 0.49999] = 0
                         
-                                ***SHOULD USE THIS TO EXCLUDE MORE BOXES AS IN EXCLUDE_IX above??? whenever a box is NOT associated with any sort of seg?
-                                
-                                        i.e. if the full_mask is empty, add the box index to exclusion above... or just fully skip at this step!!!
-                                
+                        mask_coords.append(np.transpose(np.where(full_mask > 0.49999)))
                         
-                        """
-                        color = np.copy(full_mask)
-                        color[full_mask > 0.49999] = i
-                        color[full_mask <= 0.49999] = 0
+                        #colored_masks[class_ids[i]] = np.max((colored_masks[class_ids[i]], color), axis=0)
+                       
                         
-                        mask_coords.append(np.transpose(np.where(color)))
+                        #colored_masks = []
+                        #mask_coords.append(colored_masks)
                         
-                        colored_masks[class_ids[i]] = np.max((colored_masks[class_ids[i]], color), axis=0)
                         
                         #print(final_masks.shape)
                         #print(full_mask.shape)
@@ -946,15 +911,16 @@ class net(nn.Module):
 
             # if no detections were made--> keep full bg mask (zeros).
             seg_probs.append(final_masks)
-            all_colored.append(colored_masks)
+            #all_colored.append(colored_masks)
 
         # create and fill results dictionary.
         results_dict = {}
         results_dict['boxes'] = box_results_list
         results_dict['seg_preds'] = np.array(seg_probs)
-        results_dict['colored_boxes'] = np.array(all_colored)
+        #results_dict['colored_boxes'] = np.array(all_colored)
 
         return results_dict
+
 
     def train_forward(self, batch, is_validation=False):
         """

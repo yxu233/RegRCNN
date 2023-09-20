@@ -116,9 +116,7 @@ def apply_wbc_to_patient(inputs):
             
             
             box_masks = np.array([b[1]['mask_coords'] for b in boxes])
-            
-            #zzz
-            
+
 
             if 0 not in scores.shape:
                 keep_scores, keep_coords, keep_n_missing, keep_regressions, keep_rg_bins, keep_rg_uncs, keep_masks = \
@@ -220,10 +218,6 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
         # get all the predictions that match the current box to build one cluster.
         matches = np.nonzero(ovr > thresh)[0]
         
-        # if len(matches) > 1:
-        #     zzz
-
-
 
         match_n_ovs = box_n_ovs[order[matches]]
         match_pc_facts = box_pc_facts[order[matches]]
@@ -233,25 +227,12 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
         match_scores = scores[order[matches]]
         
         
-        ### FIND AVERAGE MASK
-        match_masks = box_masks[order[matches]]
-        intersect = np.vstack(match_masks)
+        ### TIGER - added FIND AVERAGE MASK
+        #match_masks = box_masks[order[matches]]
+        #intersect = np.vstack(match_masks)
         
-        intersect = np.unique(intersect, axis=0)
+        #intersect = np.unique(intersect, axis=0)
         
-        # tmp = np.zeros(np.shape(segmentation))
-        # for m_id, mask in enumerate(match_masks):
-        #     tmp[mask[:, 2], mask[:, 0], mask[:, 1]] = m_id + 1
-        
-        # tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'tmp.tif', tmp)        
-        
-        
-        # for reg in case:
-        #     intersect = (reg[:, None] == overlap).all(-1).any(-1)
-        #     intersect = reg[intersect]
-        #     intersect = len(intersect)
-
-
 
 
         # weight all scores in cluster by patch factors, and size.
@@ -305,7 +286,7 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
             keep_regress.append(avg_regress)
             keep_rg_uncs.append(avg_rg_uncs)
             keep_rg_bins.append(avg_rg_bins)
-            keep_masks.append(intersect)
+            #keep_masks.append(intersect)
 
         # get index of all elements that were not matched and discard all others.
         inds = np.nonzero(ovr <= thresh)[0]

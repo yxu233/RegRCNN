@@ -39,6 +39,8 @@ print(device)
 
 
 def expand_add_stragglers(to_assign, clean_labels):
+    
+    to_assign = np.asarray(to_assign, np.int32)  ### required for measure.regionprops
     cc_ass = measure.regionprops(to_assign)
     for ass in cc_ass:
         
@@ -51,6 +53,23 @@ def expand_add_stragglers(to_assign, clean_labels):
 
         exp = expand_coord_to_neighborhood(coords, lower=1, upper=1 + 1)   ### always need +1 because of python indexing
         exp = np.vstack(exp)
+        
+        
+        # make sure it doesnt go out of bounds
+        exp[:, 0][exp[:, 0] >= clean_labels.shape[0]] = clean_labels.shape[0] - 1
+        exp[:, 0][exp[:, 0] < 0] = 0
+        
+        
+        exp[:, 1][exp[:, 1] >= clean_labels.shape[1]] = clean_labels.shape[1] - 1
+        exp[:, 1][exp[:, 1] < 0] = 0
+
+
+        exp[:, 2][exp[:, 2] >= clean_labels.shape[2]] = clean_labels.shape[2] - 1
+        exp[:, 2][exp[:, 2] < 0] = 0
+        
+        
+        
+        
 
         values = clean_labels[exp[:, 0], exp[:, 1], exp[:, 2]]
         
@@ -70,8 +89,385 @@ def expand_add_stragglers(to_assign, clean_labels):
     return clean_labels
         
 
+def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patches, patch_size, patch_depth, file_num, focal_cube, debug=0):
+    print('run async for: ' + str(file_num))
+    
+    
+    im_size = np.shape(input_im); width = im_size[1];  height = im_size[2]; depth_im = im_size[0];
+    
+    filename = input_name.split('/')[-1].split('.')[0:-1]
+    filename = '.'.join(filename)
+
+    input_im = np.expand_dims(input_im, axis=0)
+    input_im = np.expand_dims(input_im, axis=2)
+    tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_input_im.tif', np.asarray(input_im, dtype=np.uint16),
+                          imagej=True, #resolution=(1/XY_res, 1/XY_res),
+                          metadata={'spacing':1, 'unit': 'um', 'axes': 'TZCYX'})  
+                                 
+
+    segmentation = np.asarray(segmentation, np.int32)
+    tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_segmentation_overlap3.tif', segmentation)
+
+    #if debug:
+        #colored_im = np.asarray(colored_im, np.int32)
+        #tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_colored_im.tif', colored_im)
+    
+    
+    ### Cleanup
+    colored_im = []; input_im = []; new_dim_im = []
+    
+
+ 
+    #%% For bounding box approach
+    print('wbc clustering for ' + str(len(all_patches)) + ' number of patches')
+    tic = time.perf_counter()
+    
+    pool_for_wbc = []
+    exclude_edge = []
+    for patch in all_patches:
+        
+        xyz = patch['xyz']
+        results = patch['results_dict']
+        boxes = np.copy(results['boxes'][0])
+        
+        #scaled_boxes = np.copy(results)
+        for idb, box in enumerate(boxes):
+            
+            
+            c = box['box_coords']
+
+            box_centers = []                        
+            
+            ### Ensure it doesn't go out of bounds
+            x_val = round((c[0] + c[2]) / 2)
+            if x_val >= patch_size:
+                x_val = patch_size - 1
+            box_centers.append(x_val)   
+            
+            
+            y_val = round((c[1] + c[3]) / 2)
+            if y_val >= patch_size:
+                y_val = patch_size - 1
+            box_centers.append(y_val)   
+
+            z_val = round((c[4] + c[5]) / 2)
+            if z_val >= patch_depth:
+                z_val = patch_depth - 1
+            box_centers.append(z_val)  
+
+            ### Add exclusion by focal_cube
+            box_centers = np.asarray(np.round(box_centers), dtype=int)
+            val = focal_cube[box_centers[0], box_centers[1], box_centers[2]]
+
+  
+            c[0] = c[0] + xyz[0]
+            c[1] = c[1] + xyz[1]
+            c[2] = c[2] + xyz[0]
+            c[3] = c[3] + xyz[1]
+            c[4] = c[4] + xyz[2]
+            c[5] = c[5] + xyz[2]
+            
+            
+ 
+            coords = np.copy(box['mask_coords']) 
+            coords[:, 0] = coords[:, 0] + xyz[0]
+            coords[:, 1] = coords[:, 1] + xyz[1]                             
+            coords[:, 2] = coords[:, 2] + xyz[2]
+            
+            
+            box['box_coords'] = c
+            box['box_n_overlaps'] = 1
+            box['patch_id'] = '0_0'
+            box['mask_coords'] = coords
+            
+
+            pool_for_wbc.append(box)
+            ### Uncomment below if want to use focal_cube exclusion
+            # if val == 0:
+            
+            #     pool_for_wbc.append(box)
+            
+            # else:
+            #     exclude_edge.append(box)   ### not needed if have overlap == 50%
+            
+            
+
+    regress_flag = False
+    n_ens = 1
+    wbc_input = [regress_flag, [pool_for_wbc], 'dummy_pid', cf.class_dict, cf.clustering_iou, n_ens]
+    
+    out = apply_wbc_to_patient(wbc_input)[0]   
+    
+
+    
+    #%% Get masks directly without any other postprocessing from maskrcnn outputs -- will have overlaps!!!
+    # box_masks = []
+    # for box in out[0]:
+    #     box_masks.append(box['mask_coords'])
+
+    # box_masks = np.asarray(box_masks[0])
+    
+    # tmp = np.zeros(np.shape(segmentation))
+    # tmp_overlap = np.zeros(np.shape(segmentation))
+    # for m_id, mask in enumerate(box_masks):
+    #     tmp[mask[:, 2], mask[:, 0], mask[:, 1]] = m_id + 1
+    #     tmp_overlap[mask[:, 2], mask[:, 0], mask[:, 1]]  = tmp_overlap[mask[:, 2], mask[:, 0], mask[:, 1]] + 1
+    
+    # tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'tmp.tif', np.asarray(tmp, dtype=np.int32))        
+    # tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'tmp_overlap.tif', np.asarray(tmp_overlap, dtype=np.int32))        
+    
 
 
+    
+    #%% For KNN based assignment of voxels to split boxes
+    
+    print('Splitting boxes with KNN')
+    patch_depth = all_patches[0]['patch_im'].shape[0]
+    patch_size = all_patches[0]['patch_im'].shape[1]
+
+    box_vert = []
+    for box in out[0]:
+        box_vert.append(box['box_coords'])
+
+    box_vert = np.asarray(np.round(np.vstack(box_vert)), dtype=int)
+    
+    
+    seg_overall = segmentation
+    
+    
+    df_cleaned = split_boxes_by_Voronoi3D(box_vert, vol_shape = seg_overall.shape)
+    merged_coords = df_cleaned['bbox_coords'].values
+    
+    
+    ### Then APPLY these boxes to mask out the objects in the main segmentation!!!
+    new_labels = np.zeros(np.shape(seg_overall))
+    #overlap = np.zeros(np.shape(seg_overall))
+    all_lens = []
+    for box_id, box_coords in enumerate(merged_coords):
+    
+        if len(box_coords) == 0:
+            continue
+        all_lens.append(len(box_coords))
+        
+
+        bc = box_coords
+        """ HACK: --- DOUBLE CHECK ON THIS SUBTRACTION HERE """
+        
+        #bc = bc - 1 ### cuz indices dont start from 0 from polygon function?
+        bc = np.asarray(bc, dtype=int)                    
+        new_labels[bc[:, 0], bc[:, 1], bc[:, 2]] = box_id + 1   
+        #overlap[bc[:, 0], bc[:, 1], bc[:, 2]] = overlap[bc[:, 0], bc[:, 1], bc[:, 2]] + 1
+        
+
+    new_labels = np.asarray(new_labels, np.int32)
+
+    new_labels[seg_overall == 0] = 0   ### This is way simpler and faster than old method of looping through each detection
+    #plot_max(new_labels)
+    
+    new_labels = np.asarray(new_labels, np.int32)
+
+
+
+    toc = time.perf_counter()
+    print(f"Step 1 in {toc - tic:0.4f} seconds")
+
+    #%% CLEANUP
+    """ CLEANUP 
+    
+            (1) Find objects that are not connected at all (spurious assignments) and only keep the larger object
+            
+            (2) The rest of the spurious assignments can be assigned to nearest object by dilating the spurious assignments
+            
+            (3) Same goes for leftover hanging bits of segmentation that were not assigned due to bounding box issues
+    
+    
+    
+            optional: do this earlier --> but delete any bounding boxes with a centroid that does NOT contain a segmented object?
+
+    """
+    
+    
+    print('Step 1: Cleaning up spurious assignments')
+    tic = time.perf_counter()
+
+              
+    to_assign = np.zeros(np.shape(new_labels))
+    cc = measure.regionprops(new_labels)
+    im_shape = new_labels.shape
+
+    obj_num = 1
+    
+    for id_o, obj in enumerate(cc):
+
+        ### scale all the coords down first so it's plotted into a super small area!
+        coords = obj['coords']
+        diff = np.max(coords, axis=0) - np.min(coords, axis=0)
+        
+        tmp = np.zeros(diff + 1)
+        scaled = coords - np.min(coords, axis=0)
+        
+        
+        tmp[scaled[:, 0], scaled[:, 1], scaled[:, 2]] = 1
+
+        ### If center is blank, also skip?
+        # if tmp[center[0], center[1], center[2]] == 0:
+            
+        #     #clean_labels[coords[:, 0], coords[:, 1], coords[:, 2]] = 0
+        #     to_assign[coords[:, 0], coords[:, 1], coords[:, 2]] = obj_num
+        #     print('empty center')
+        #     obj_num += 1
+        #     continue
+
+            
+        bw_lab = measure.label(tmp, connectivity=1)
+        
+        
+        if np.max(bw_lab) > 1:
+            check_cc = measure.regionprops(bw_lab)
+
+            #print(str(id_o))
+            all_lens = []
+            all_coords = []
+            for check in check_cc:
+                all_lens.append(len(check['coords']))
+                all_coords.append(check['coords'])
+            
+            all_coords = np.asarray(all_coords)
+            
+            min_thresh = 30
+            if np.max(all_lens) > min_thresh: ### keep the main object if it's large enough else delete everything by making it so it will 
+                                              ### be re-assigned to actual nearest neighbor in the "to_assign" array below
+            
+                amax = np.argmax(all_lens)
+                
+                ### delete all objects that are NOT the largest conncected component
+                ind = np.delete(np.arange(len(all_lens)), amax)
+                to_ass = all_coords[ind]
+                
+            else:
+                to_ass = all_coords
+
+            ### Have to loop through coord by coord to make sure they remain separate
+            for coord_ass in to_ass:
+                
+                ### scale coordinates back up
+                coord_ass = coord_ass + np.min(coords, axis=0)
+                
+                to_assign[coord_ass[:, 0], coord_ass[:, 1], coord_ass[:, 2]] = obj_num
+                
+                obj_num += 1
+
+
+    #to_assign = np.asarray(to_assign, np.int32)  ### required for measure.regionprops
+    if debug:
+       
+        tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_to_assign_FOCAL.tif', to_assign)
+                    
+    
+    
+    ### Expand each to_assign to become a neighborhood!  ### OR JUST DILATE THE WHOLE IMAGE?
+    clean_labels = new_labels
+    clean_labels[to_assign > 0] = 0
+
+    clean_labels = expand_add_stragglers(to_assign, clean_labels)
+    if debug:
+        tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_ass_step1.tif', clean_labels)                
+    
+    
+    toc = time.perf_counter()
+    print(f"Step 1 in {toc - tic:0.4f} seconds")
+    
+    #%% ## Expand each leftover segmentation piece to be a part of the neighborhood!
+    print('Step 2: Cleaning up neighborhoods')
+    
+    bw_seg = segmentation
+    bw_seg[bw_seg > 0] = 1
+    bw_seg[clean_labels > 0] = 0
+    
+    
+    stragglers = measure.label(bw_seg)
+    clean_labels = expand_add_stragglers(stragglers, clean_labels)
+    ### Cleanup
+    bw_seg = []; stragglers = []
+    if debug:
+        tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_ass_step2.tif', clean_labels)                      
+    
+    
+    #%% ## Also clean up small objects and add them to nearest object that is large
+    print('Step 3: Cleaning up adjacent objects')
+    min_size = 80
+    all_obj = measure.regionprops(clean_labels)
+    small = np.zeros(np.shape(clean_labels))
+    counter = 1
+    for o_id, obj in enumerate(all_obj):
+        c = obj['coords']
+        
+        if len(c) < min_size:
+            small[c[:, 0], c[:, 1], c[:, 2]] = counter
+            counter += 1
+        
+    #small = np.asarray(small, np.int32)
+    clean_labels[small > 0] = 0   ### must remember to mask out all the small areas otherwise will get reassociated back with the small area!
+    clean_labels = expand_add_stragglers(small, clean_labels)
+
+    ### Add back in all the small objects that were NOT near enough to touch anything else
+    small[clean_labels > 0] = 0
+    clean_labels[small > 0] = small[small > 0]
+    
+
+    
+    if debug:
+        tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_ass_step3_FOCAL.tif', clean_labels)                      
+
+
+
+    #%% ## Also go through Z-slices and remove any super thin sections in XY? Like < 10 pixels
+    print('Step 4: Cleaning up z-stragglers')
+    count = 0
+    for zid, zslice in enumerate(clean_labels):
+        cc = measure.regionprops(zslice)
+        for obj in cc:
+            coords = obj['coords']
+            if len(coords) < 10:
+                clean_labels[zid, coords[:, 0], coords[:, 1]] = 0
+                count += 1
+                
+    if debug:
+        tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_ass_step4_FOCAL.tif', clean_labels)           
+    
+    
+    ### Also remove super large objects?
+    
+    
+    
+    
+    #%% Pad entire image and shift by 1 to the right and 1 down
+    print('Step 5: shifting segmentation by +1')
+    shift_im = np.zeros([depth_im + 1, width + 1, height + 1])
+    shift_im[1:, 1:, 1:] = clean_labels
+    
+    shifted = shift_im[:-1, :-1, :-1]
+    
+    shifted = np.asarray(shifted, np.int32)
+    tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_shfited.tif', shifted)    
+    
+    toc = time.perf_counter()
+    print(f"Total post-processing steps 1 - 5 in {toc - tic:0.4f} seconds")                
+    
+    
+
+    ### Cleanup
+    new_labels = []; clean_labels = []; shifted = []; segmentation = []; small = []; split_seg = []; shift_im = []
+    tmp = []; to_assign = []; seg_overall = []
+    
+    
+    return 1
+
+
+
+
+#%%
+    
 if __name__=="__main__":
     class Args():
         def __init__(self):
@@ -190,15 +586,15 @@ if __name__=="__main__":
         
 
         input_im_stack = [];
-        for i in range(len(examples)):
+        for file_num in range(len(examples)):
              
              with torch.set_grad_enabled(False):  # saves GPU RAM            
-                input_name = examples[i]['input']            
+                input_name = examples[file_num]['input']            
                 input_im = tiff.imread(input_name)
                 
        
                 """ Analyze each block with offset in all directions """ 
-                print('Starting inference on volume: ' + str(i) + ' of total: ' + str(len(examples)))
+                print('Starting inference on volume: ' + str(file_num) + ' of total: ' + str(len(examples)))
                 
                 ### Define patch sizes
                 patch_size=128; patch_depth=16
@@ -412,448 +808,7 @@ if __name__=="__main__":
 
 
 
-        def post_process_async(input_im, segmentation, input_name, all_patches, patch_size, patch_depth):
-            print('run async')
-            
-            filename = input_name.split('/')[-1].split('.')[0:-1]
-            filename = '.'.join(filename)
 
-            input_im = np.expand_dims(input_im, axis=0)
-            input_im = np.expand_dims(input_im, axis=2)
-            tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_input_im.tif', np.asarray(input_im, dtype=np.uint16),
-                                  imagej=True, #resolution=(1/XY_res, 1/XY_res),
-                                  metadata={'spacing':1, 'unit': 'um', 'axes': 'TZCYX'})  
-                                         
-
-            segmentation = np.asarray(segmentation, np.int32)
-            tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_segmentation_overlap3.tif', segmentation)
-
-            #if debug:
-                #colored_im = np.asarray(colored_im, np.int32)
-                #tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_colored_im.tif', colored_im)
-            
-            
-            ### Cleanup
-            colored_im = []; input_im = []; new_dim_im = []
-            
-
- 
-            #%% For bounding box approach
-            print('wbc clustering')
-            tic = time.perf_counter()
-            
-            pool_for_wbc = []
-            exclude_edge = []
-            for patch in all_patches:
-                
-                xyz = patch['xyz']
-                results = patch['results_dict']
-                boxes = np.copy(results['boxes'][0])
-                
-                #scaled_boxes = np.copy(results)
-                for idb, box in enumerate(boxes):
-                    
-                    
-                    c = box['box_coords']
-
-                    box_centers = []                        
-                    
-                    ### Ensure it doesn't go out of bounds
-                    x_val = round((c[0] + c[2]) / 2)
-                    if x_val >= patch_size:
-                        x_val = patch_size - 1
-                    box_centers.append(x_val)   
-                    
-                    
-                    y_val = round((c[1] + c[3]) / 2)
-                    if y_val >= patch_size:
-                        y_val = patch_size - 1
-                    box_centers.append(y_val)   
-
-                    z_val = round((c[4] + c[5]) / 2)
-                    if z_val >= patch_depth:
-                        z_val = patch_depth - 1
-                    box_centers.append(z_val)  
-
-                    ### Add exclusion by focal_cube
-                    box_centers = np.asarray(np.round(box_centers), dtype=int)
-                    val = focal_cube[box_centers[0], box_centers[1], box_centers[2]]
-
-      
-                    c[0] = c[0] + xyz[0]
-                    c[1] = c[1] + xyz[1]
-                    c[2] = c[2] + xyz[0]
-                    c[3] = c[3] + xyz[1]
-                    c[4] = c[4] + xyz[2]
-                    c[5] = c[5] + xyz[2]
-                    
-                    
- 
-                    coords = np.copy(box['mask_coords']) 
-                    coords[:, 0] = coords[:, 0] + xyz[0]
-                    coords[:, 1] = coords[:, 1] + xyz[1]                             
-                    coords[:, 2] = coords[:, 2] + xyz[2]
-                    
-                    
-                    box['box_coords'] = c
-                    box['box_n_overlaps'] = 1
-                    box['patch_id'] = '0_0'
-                    box['mask_coords'] = coords
-                    
-
-                    pool_for_wbc.append(box)
-                    ### Uncomment below if want to use focal_cube exclusion
-                    # if val == 0:
-                    
-                    #     pool_for_wbc.append(box)
-                    
-                    # else:
-                    #     exclude_edge.append(box)   ### not needed if have overlap == 50%
-                    
-                    
-
-            regress_flag = False
-            n_ens = 1
-            wbc_input = [regress_flag, [pool_for_wbc], 'dummy_pid', cf.class_dict, cf.clustering_iou, n_ens]
-            
-            out = apply_wbc_to_patient(wbc_input)[0]   
-            
-
-            
-            #%% Get masks directly without any other postprocessing from maskrcnn outputs -- will have overlaps!!!
-            # box_masks = []
-            # for box in out[0]:
-            #     box_masks.append(box['mask_coords'])
-        
-            # box_masks = np.asarray(box_masks[0])
-            
-            # tmp = np.zeros(np.shape(segmentation))
-            # tmp_overlap = np.zeros(np.shape(segmentation))
-            # for m_id, mask in enumerate(box_masks):
-            #     tmp[mask[:, 2], mask[:, 0], mask[:, 1]] = m_id + 1
-            #     tmp_overlap[mask[:, 2], mask[:, 0], mask[:, 1]]  = tmp_overlap[mask[:, 2], mask[:, 0], mask[:, 1]] + 1
-            
-            # tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'tmp.tif', np.asarray(tmp, dtype=np.int32))        
-            # tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'tmp_overlap.tif', np.asarray(tmp_overlap, dtype=np.int32))        
-            
-
-
-            
-            #%% For KNN based assignment of voxels to split boxes
-            
-            print('Splitting boxes with KNN')
-            patch_depth = patch_im.shape[0]
-            patch_size = patch_im.shape[1]
-        
-            box_vert = []
-            for box in out[0]:
-                box_vert.append(box['box_coords'])
-        
-            box_vert = np.asarray(np.round(np.vstack(box_vert)), dtype=int)
-            
-            
-            seg_overall = np.copy(segmentation)
-            
-            
-            df_cleaned = split_boxes_by_Voronoi3D(box_vert, vol_shape = seg_overall.shape)
-            merged_coords = df_cleaned['bbox_coords'].values
-            
-            
-            ### Then APPLY these boxes to mask out the objects in the main segmentation!!!
-            new_labels = np.zeros(np.shape(seg_overall))
-            #overlap = np.zeros(np.shape(seg_overall))
-            all_lens = []
-            for box_id, box_coords in enumerate(merged_coords):
-            
-                if len(box_coords) == 0:
-                    continue
-                all_lens.append(len(box_coords))
-                
-
-                bc = box_coords
-                """ HACK: --- DOUBLE CHECK ON THIS SUBTRACTION HERE """
-                
-                #bc = bc - 1 ### cuz indices dont start from 0 from polygon function?
-                bc = np.asarray(bc, dtype=int)                    
-                new_labels[bc[:, 0], bc[:, 1], bc[:, 2]] = box_id + 1   
-                #overlap[bc[:, 0], bc[:, 1], bc[:, 2]] = overlap[bc[:, 0], bc[:, 1], bc[:, 2]] + 1
-                
-
-            new_labels = np.asarray(new_labels, np.int32)
-
-            new_labels[seg_overall == 0] = 0   ### This is way simpler and faster than old method of looping through each detection
-            plot_max(new_labels)
-            
-            new_labels = np.asarray(new_labels, np.int32)
-
-
-
-            toc = time.perf_counter()
-            print(f"Step 1 in {toc - tic:0.4f} seconds")
-
-            #%% CLEANUP
-            """ CLEANUP 
-            
-                    (1) Find objects that are not connected at all (spurious assignments) and only keep the larger object
-                    
-                    (2) The rest of the spurious assignments can be assigned to nearest object by dilating the spurious assignments
-                    
-                    (3) Same goes for leftover hanging bits of segmentation that were not assigned due to bounding box issues
-            
-            
-            
-                    optional: do this earlier --> but delete any bounding boxes with a centroid that does NOT contain a segmented object?
-
-            """
-            
-            
-            print('Step 1: Cleaning up spurious assignments')
-            tic = time.perf_counter()
-
-                      
-            to_assign = np.zeros(np.shape(new_labels))
-            cc = measure.regionprops(new_labels)
-            im_shape = new_labels.shape
-            
-            
-            obj_num = 1
-            
-            
-            # ### speed things up a bit by focusing only on cells that have multiple indexs in them (i.e. ignore the fully isolated cells)
-            # bw_iso = np.copy(new_labels)
-            # bw_iso[bw_iso > 0] = 1
-            # bw_iso = measure.label(bw_iso, connectivity = 1)
-            
-            # cc = measure.regionprops(bw_iso)
-            
-            # skip_ids = []
-            # for id_o, obj in enumerate(cc):
-            #     coords = obj['coords']
-            #     vals = new_labels[coords[:, 0], coords[:, 1], coords[:, 2]]
-                
-            #     #vals = np.unique(vals)
-            #     #vals = vals[vals != 0]
-                
-            #     if len(vals) > 1:
-            #         #print(vals)
-            #         continue
-            #     else:
-            #         skip_ids.append(vals)
-            #         print('skipped')
-            
-            # all_cc = []
-            # for id_s in np.arange(len(cc)): 
-                
-                
-            #     kwargs = {'id_o':id_s, 'obj':cc[id_s], 'im_shape':im_shape}
-            #     all_cc.append(kwargs)
-                
-                
-            # p = Pool(8)
-            # all_df = p.map(remove_sticky_ends, all_cc)
-            # p.close()  ### to prevent memory leak 
-
-               
-            # def remove_sticky_ends(kwargs):
-                
-            #     id_o = kwargs['id_o']
-            #     obj = kwargs['obj']
-            #     im_shape = kwargs['im_shape']
-            
-
-            
-            for id_o, obj in enumerate(cc):
-                
-                
-
-                ### scale all the coords down first so it's plotted into a super small area!
-                coords = obj['coords']
-                diff = np.max(coords, axis=0) - np.min(coords, axis=0)
-                
-                tmp = np.zeros(diff + 1)
-                scaled = coords - np.min(coords, axis=0)
-                
-                
-                tmp[scaled[:, 0], scaled[:, 1], scaled[:, 2]] = 1
-                
-                # tmp = np.zeros(im_shape)
-                
-                # center = np.asarray(np.round(obj['centroid']), dtype=int)
-                
-                # tmp[coords[:, 0], coords[:, 1], coords[:, 2]] = 1
-                
-                ### If center is blank, also skip?
-                # if tmp[center[0], center[1], center[2]] == 0:
-                    
-                #     #clean_labels[coords[:, 0], coords[:, 1], coords[:, 2]] = 0
-                #     to_assign[coords[:, 0], coords[:, 1], coords[:, 2]] = obj_num
-                #     print('empty center')
-                #     obj_num += 1
-                #     continue
-                
-                ### SPEED THIS UP BY CROPPING IT OUT
-                # crop_size = 20
-                # z_size = 12
-                # crop_input, box_xyz, box_over, boundaries_crop = crop_around_centroid_with_pads(np.moveaxis(tmp, 0, -1), y=center[2],  \
-                #                                                                                 x=center[1], z=center[0], crop_size=crop_size, z_size=z_size,  \
-                #                                                                                 height=height, width=width, depth=depth_im)      
-                    
-                #bw_lab = measure.label(np.moveaxis(crop_input, -1, 0), connectivity=1)
-                #print(id_o)
-                    
-                bw_lab = measure.label(tmp, connectivity=1)
-                
-                
-                if np.max(bw_lab) > 1:
-                    check_cc = measure.regionprops(bw_lab)
-
-                    #print(str(id_o))
-                    all_lens = []
-                    all_coords = []
-                    for check in check_cc:
-                        all_lens.append(len(check['coords']))
-                        all_coords.append(check['coords'])
-                    
-                    #all_coords = np.asarray(all_coords)
-                    
-                    min_thresh = 30
-                    if np.max(all_lens) > min_thresh: ### keep the main object if it's large enough else delete everything by making it so it will 
-                                                      ### be re-assigned to actual nearest neighbor in the "to_assign" array below
-                    
-                        amax = np.argmax(all_lens)
-                        
-                        ### delete all objects that are NOT the largest conncected component
-                        ind = np.delete(np.arange(len(all_lens)), amax)
-                        to_ass = all_coords[ind]
-                        
-                        #to_ass = np.vstack(to_ass)
-                        
-                    else:
-                        #to_ass = np.vstack(all_coords)
-                        to_ass = all_coords
-                        
-                        
-                    #return to_ass
-                        
-                       
-
-                    ### Have to loop through coord by coord to make sure they remain separate
-                    for coord_ass in to_ass:
-                        
-                        #zzz
-                        
-                        ### scale coordinates back up
-                        #coord_ass = scale_coords_of_crop_to_full(np.roll([coord_ass], -1), box_xyz, box_over)
-                        #coord_ass = np.roll(coord_ass, 1)
-                        
-                        ### scale coordinates back up
-                        coord_ass = coord_ass + np.min(coords, axis=0)
-                        
-                        to_assign[coord_ass[:, 0], coord_ass[:, 1], coord_ass[:, 2]] = obj_num
-                        
-                        obj_num += 1
-
-
-            to_assign = np.asarray(to_assign, np.int32)
-            if debug:
-                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_to_assign_FOCAL.tif', to_assign)
-                            
-            
-            
-            ### Expand each to_assign to become a neighborhood!  ### OR JUST DILATE THE WHOLE IMAGE?
-            clean_labels = np.copy(new_labels)
-            clean_labels[to_assign > 0] = 0
-
-            clean_labels = expand_add_stragglers(to_assign, clean_labels)
-            if debug:
-                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_ass_step1.tif', clean_labels)                
-            
-            
-            toc = time.perf_counter()
-            print(f"Step 1 in {toc - tic:0.4f} seconds")
-            
-            #%% ## Expand each leftover segmentation piece to be a part of the neighborhood!
-            print('Step 2: Cleaning up neighborhoods')
-            
-            bw_seg = np.copy(segmentation)
-            bw_seg[bw_seg > 0] = 1
-            bw_seg[clean_labels > 0] = 0
-            
-            
-            stragglers = measure.label(bw_seg)
-            clean_labels = expand_add_stragglers(stragglers, clean_labels)
-            ### Cleanup
-            bw_seg = []; stragglers = []
-            if debug:
-                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_ass_step2.tif', clean_labels)                      
-            
-            
-            #%% ## Also clean up small objects and add them to nearest object that is large
-            print('Step 3: Cleaning up adjacent objects')
-            min_size = 80
-            all_obj = measure.regionprops(clean_labels)
-            small = np.zeros(np.shape(clean_labels))
-            counter = 1
-            for o_id, obj in enumerate(all_obj):
-                c = obj['coords']
-                
-                if len(c) < min_size:
-                    small[c[:, 0], c[:, 1], c[:, 2]] = counter
-                    counter += 1
-                
-            small = np.asarray(small, np.int32)
-            clean_labels[small > 0] = 0   ### must remember to mask out all the small areas otherwise will get reassociated back with the small area!
-            clean_labels = expand_add_stragglers(small, clean_labels)
-
-            ### Add back in all the small objects that were NOT near enough to touch anything else
-            small[clean_labels > 0] = 0
-            clean_labels[small > 0] = small[small > 0]
-            
-
-            
-            if debug:
-                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_ass_step3_FOCAL.tif', clean_labels)                      
-
-
-
-            #%% ## Also go through Z-slices and remove any super thin sections in XY? Like < 10 pixels
-            print('Step 4: Cleaning up z-stragglers')
-            count = 0
-            for zid, zslice in enumerate(clean_labels):
-                cc = measure.regionprops(zslice)
-                for obj in cc:
-                    coords = obj['coords']
-                    if len(coords) < 10:
-                        clean_labels[zid, coords[:, 0], coords[:, 1]] = 0
-                        count += 1
-                        
-            if debug:
-                tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_ass_step4_FOCAL.tif', clean_labels)           
-            
-            
-            ### Also remove super large objects?
-            
-            
-            
-            
-            #%% Pad entire image and shift by 1 to the right and 1 down
-            print('Step 5: shifting segmentation by +1')
-            shift_im = np.zeros([depth_im + 1, width + 1, height + 1])
-            shift_im[1:, 1:, 1:] = clean_labels
-            
-            shifted = shift_im[:-1, :-1, :-1]
-            
-            shifted = np.asarray(shifted, np.int32)
-            tiff.imwrite(sav_dir + filename + '_' + str(int(i)) +'_shfited.tif', shifted)    
-            
-            toc = time.perf_counter()
-            print(f"Total post-processing steps 1 - 5 in {toc - tic:0.4f} seconds")                
-            
-            
-        
-            ### Cleanup
-            new_labels = []; clean_labels = []; shifted = []; seg_overall; segmentation = []; small = []; split_seg = []; shift_im = []
-            tmp = []; to_assign = []; seg_overall = []
             
 
 
@@ -868,7 +823,8 @@ if __name__=="__main__":
         
         ### get NEXT tile asynchronously!!!
 
-        poolThread.apply_async(post_process_async, (input_im, segmentation, input_name, all_patches, patch_size, patch_depth)) 
+        poolThread.apply_async(post_process_async, (cf, input_im, segmentation, input_name, sav_dir, all_patches, 
+                                                    patch_size, patch_depth, file_num, focal_cube, debug)) 
         poolThread.close()
             
         #poolThread.join()

@@ -115,20 +115,20 @@ def apply_wbc_to_patient(inputs):
             box_rg_uncs = np.array([b[1]['rg_uncertainty'] if 'rg_uncertainty' in b[1].keys() else float('NaN') for b in boxes])
             
             
-            box_masks = np.array([b[1]['mask_coords'] for b in boxes])
+            #box_masks = np.array([b[1]['mask_coords'] for b in boxes])
 
 
             if 0 not in scores.shape:
-                keep_scores, keep_coords, keep_n_missing, keep_regressions, keep_rg_bins, keep_rg_uncs, keep_masks = \
+                keep_scores, keep_coords, keep_n_missing, keep_regressions, keep_rg_bins, keep_rg_uncs = \
                     weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_bins, box_rg_uncs,
-                                             box_regress, box_patch_id, thresh, n_ens,
-                                             box_masks)
+                                             box_regress, box_patch_id, thresh, n_ens
+                                             )
 
 
                 for boxix in range(len(keep_scores)):
                     clustered_box = {'box_type': 'det', 'box_coords': keep_coords[boxix],
                                      'box_score': keep_scores[boxix], 'cluster_n_missing': keep_n_missing[boxix],
-                                     'box_pred_class_id': cl, 'mask_coords':keep_masks}
+                                     'box_pred_class_id': cl}
                     if regress_flag:
                         clustered_box.update({'regression': keep_regressions[boxix],
                                               'rg_uncertainty': keep_rg_uncs[boxix],
@@ -143,7 +143,7 @@ def apply_wbc_to_patient(inputs):
 
 
 def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_bins, box_rg_uncs,
-                             box_regress, box_patch_id, thresh, n_ens, box_masks):
+                             box_regress, box_patch_id, thresh, n_ens):
     """Consolidates overlapping predictions resulting from patch overlaps, test data augmentations and temporal ensembling.
     clusters predictions together with iou > thresh (like in NMS). Output score and coordinate for one cluster are the
     average weighted by individual patch center factors (how trustworthy is this candidate measured by how centered
@@ -192,7 +192,7 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
     keep_regress = []
     keep_rg_bins = []
     keep_rg_uncs = []
-    keep_masks = []
+    #keep_masks = []
 
     while order.size > 0:
         i = order[0]  # highest scoring element
@@ -294,7 +294,7 @@ def weighted_box_clustering(box_coords, scores, box_pc_facts, box_n_ovs, box_rg_
         assert np.all(inds == inds_where), "inds_nonzero {} \ninds_where {}".format(inds, inds_where)
         order = order[inds]
 
-    return keep_scores, keep_coords, keep_n_missing, keep_regress, keep_rg_bins, keep_rg_uncs, keep_masks
+    return keep_scores, keep_coords, keep_n_missing, keep_regress, keep_rg_bins, keep_rg_uncs
 
 
 def apply_nms_to_patient(inputs):

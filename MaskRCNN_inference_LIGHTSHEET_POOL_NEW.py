@@ -292,7 +292,7 @@ if __name__=="__main__":
                     
                 
                 ### for continuing the run
-                for id_c in range(140, len(all_xyzL)):
+                for id_c in range(0, len(all_xyzL)):
                     s_c = all_xyzL[id_c]
                     
                     ### for debug:
@@ -304,7 +304,7 @@ if __name__=="__main__":
                     
          
                     ### Load first tile normally, and then the rest as asynchronous processes
-                    if id_c == 140:
+                    if id_c == 0:
                         input_im, og_shape = get_im(dset, s_c, Lpatch_depth, Lpatch_size)
                         print('loaded normally')
                         
@@ -492,38 +492,35 @@ if __name__=="__main__":
                                        new_box_list = []
                                        tmp_check = np.zeros(np.shape(quad_intensity[0][0]))
                                        for bid, box in enumerate(output['boxes'][0]):
-                                     
+                                            """ 
                                            
-                                           c = box['box_coords']
+                                           
+                                                Some bounding boxes have no associated segmentations!!! Skip these
+                                           
+                                           
+                                           
+                                            """
+                                            if len(box['mask_coords']) == 0:
+                                                continue
+                                                                                
+                                            ### Only add if above threshold
+                                            if box['box_score'] > thresh:
+                                                c = box['box_coords']
     
-                                           """ 
-                                           
-                                           
-                                               Some bounding boxes have no associated segmentations!!! Skip these
-                                           
-                                           
-                                           
-                                           """
-                                           if len(box['mask_coords']) == 0:
-                                               continue
-                                           
+                                                box_centers = [(c[ii] + c[ii + 2]) / 2 for ii in range(2)]
+                                                box_centers.append((c[4] + c[5]) / 2)
     
-                                           box_centers = [(c[ii] + c[ii + 2]) / 2 for ii in range(2)]
-                                           box_centers.append((c[4] + c[5]) / 2)
-                            
-                            
-                                           factor = np.mean([norm.pdf(bc, loc=pc, scale=pc * 0.8) * np.sqrt(2 * np.pi) * pc * 0.8 for bc, pc in \
-                                                             zip(box_centers, np.array(quad_intensity[0][0].shape) / 2)])
-          
-                                           
-                                           box['box_patch_center_factor'] = factor
-                                           
-                                           
-                                           ### Only add if above threshold
-                                           if box['box_score'] > thresh:
-                                               new_box_list.append(box)     
+                                                # factor = np.mean([norm.pdf(bc, loc=pc, scale=pc * 0.8) * np.sqrt(2 * np.pi) * pc * 0.8 for bc, pc in \
+                                                #                   zip(box_centers, np.array(quad_intensity[0][0].shape) / 2)]
+                                                # slightly faster call
+                                                pc =  np.array(quad_intensity[0][0].shape) / 2
+                                                factor = np.mean([norm.pdf(box_centers, loc=pc, scale=pc * 0.8) * np.sqrt(2 * np.pi) * pc * 0.8 ])
+                                                    
+                                                    
+                                                box['box_patch_center_factor'] = factor
+                                                new_box_list.append(box)     
                                                
-          
+              
                                        
                                        output['boxes'] = [new_box_list]
                                        results_dict = output
@@ -544,27 +541,29 @@ if __name__=="__main__":
                                        
                                        for bs in range(batch_size):
         
-                                           box_df = results_dict['boxes'][bs]
-                                           box_vert = []
-                                           box_score = []
-                                           mask_coords = []
-                                           for box in box_df:
+                                           # box_df = results_dict['boxes'][bs]
+                                           # box_vert = []
+                                           # box_score = []
+                                           # mask_coords = []
+                                           # for box in box_df:
                                               
-                                                   box_vert.append(box['box_coords'])
-                                                   box_score.append(box['box_score'])
-                                                   mask_coords.append(box['mask_coords'])
+                                           #         box_vert.append(box['box_coords'])
+                                           #         box_score.append(box['box_score'])
+                                           #         mask_coords.append(box['mask_coords'])
                                                    
-                                           if len(box_vert) == 0:
-                                               continue
+                                           # if len(box_vert) == 0:
+                                           #     continue
             
             
-                                           patch_im = np.copy(batch_im[bs][0])
-                                           patch_im = np.moveaxis(patch_im, -1, 0)   ### must be depth first
-                                            
+                                           patch_im = batch_im[bs][0]
+                                           #patch_im = np.moveaxis(patch_im, -1, 0)   ### must be depth first
+                                        
+                                           # save memory by deleting seg_preds
+                                           results_dict['seg_preds'] = []
                         
-                                           all_patches.append({'box_vert':box_vert, 'results_dict': results_dict, 'patch_im': patch_im, 'total_blocks': bs % total_blocks + (total_blocks - batch_size), 
-                                                                #'focal_cube':focal_cube, 
-                                                                'xyz':batch_xyz[bs], 'mask_coords':mask_coords})
+                                           all_patches.append({ 'results_dict': results_dict, 'total_blocks': bs % total_blocks + (total_blocks - batch_size), 
+                                                                 #'focal_cube':focal_cube, 'patch_im': patch_im, 'box_vert':box_vert, 'mask_coords':mask_coords
+                                                                'xyz':batch_xyz[bs]})
               
                                            
                                        ### Reset batch
@@ -583,54 +582,29 @@ if __name__=="__main__":
                     
                     print(f"MaskRCNN analysis in {toc - tic:0.4f} seconds")                    
                     
-                    ### Initiate poolThread
-                    #poolThread = ThreadPool(processes=1)
-                    # if called:
-                    #     called = post_result.get()
-                    #     post_result = poolThread_post_process.apply_async(post_process_async, (cf, input_im, segmentation, input_name, sav_dir, all_patches, 
-                    #                                              patch_size, patch_depth, id_c, focal_cube, debug)) 
                     
-                    # ### get NEXT tile asynchronously!!!
-                    # #zzz
-                    # else:
-                    #     post_result = poolThread_post_process.apply_async(post_process_async, (cf, input_im, segmentation, input_name, sav_dir, all_patches, 
-                    #                                              patch_size, patch_depth, id_c, focal_cube, debug)) 
-
-                    #     called = 1
-                    
-            
-                    #poolThread_post_process.starmap_async(post_process_async, [(cf, input_im, segmentation, input_name, sav_dir, all_patches, 
-                    #                                            patch_size, patch_depth, id_c, focal_cube, debug)]).get()         
-
+                    #post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patches, patch_size, patch_depth, id_c, focal_cube, s_c, debug)
+                
 
 
 
                     if called:
                         executor.submit(post_process_async, cf, input_im, segmentation, input_name, sav_dir, all_patches, 
-                                                                 patch_size, patch_depth, id_c, focal_cube, debug)
+                                                                 patch_im, patch_size, patch_depth, id_c, focal_cube, s_c=s_c, debug=debug)
                     
-                    ### get NEXT tile asynchronously!!!
-                    #zzz
                     else:
                         executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
                         
                         executor.submit(post_process_async, cf, input_im, segmentation, input_name, sav_dir, all_patches, 
-                                                                 patch_size, patch_depth, id_c, focal_cube, debug)
+                                                                 patch_im, patch_size, patch_depth, id_c, focal_cube, s_c=s_c, debug=debug)
                         
-                        #post_result = poolThread_post_process.apply_async(post_process_async, (cf, input_im, segmentation, input_name, sav_dir, all_patches, 
-                        #                                         patch_size, patch_depth, id_c, focal_cube, debug)) 
-
                         called = 1
                     
-
             
                     ### clean-up
                     segmentation = []; input_im = []; all_patches = []
                     
                     
-                    """ RETURN THE SHIFTED ARRAY FROM THE ASYNC, or just put the lines below into the async function!"""
-                    
-
 
                     #%% Output to memmap array
                     
@@ -644,107 +618,9 @@ if __name__=="__main__":
                     
                     # print(f"Save in {toc - tic:0.4f} seconds")
                     
-                    
-                    """ Also save list of coords of where the cells are located so that can easily access later (or plot without making a whole image!) """
-                    #print('saving coords')
-                    #tic = time.perf_counter()
-                    # from skimage import measure
-                    # #labels = measure.label(segmentation)
-                    # #blobs_labels = measure.label(blobs, background=0)
-                    # cc = measure.regionprops(segmentation)
-                    
-                    
-                    # ########################## TOO SLOW TO USE APPEND TO ADD EACH ROW!!!
-                    # ######################### MUCH FASTER TO JUST MAKE A DICTIONARY FIRST, AND THEN CONVERT TO DATAFRAME AND CONCAT
-                    # d = {}
-                    # for i_list, cell in enumerate(cc):
-                    #     center = cell['centroid']
-                    #     center = [round(center[0]), round(center[1]), round(center[2])]
-                        
-                        
-                    #     coords = cell['coords']
-                        
-                    #     coords[:, 0] = coords[:, 0] + s_c[2]
-                    #     coords[:, 1] = coords[:, 1] + s_c[1]
-                    #     coords[:, 2] = coords[:, 2] + s_c[0]
-                        
-                    #     d[i_list] = {'offset': s_c, 'block_num': id_c, 
-                    #            'Z': center[0], 'X': center[1], 'Y': center[2],
-                    #            'Z_scaled': center[0] + s_c[2], 'X_scaled': center[1] + s_c[1], 'Y_scaled': center[2] + s_c[0],
-                    #            'equiv_diam': cell['equivalent_diameter'], 'vol': cell['area'], 'coords':coords}
-                        
-                        
-                    """
-                    
-                    
-                        TO DO 
-                        
-                            1) Remember to scale s_c so that the coordinates are related to ORIGINAL location NOT with overlap_xy, overlap_xz
-                        
-                            2) ***ALSO, find some way to remove overlap from LARGE patch edges? - i.e. edges of s_c
-                    
-                    
-
-                       MAKE PRE-LOADING DATA possible, so it doesn't have to wait so long each time
-
-                    
-                    
-                    """
-                    
-                    
-                    
-                    
-                    # df = pd.DataFrame.from_dict(d, "index")
-            
-                    # coords_df = pd.concat([coords_df, df])           
-                                            
-                    
-                    #toc = time.perf_counter()
-                    
-                    
-                    # np.save(sav_dir + filename + '_numpy_arr', coords_df)
-                    # #print(f"Save coords in {toc - tic:0.4f} seconds \n\n")
-                    
-                    # print('Saved asynchronously')
-                    
-                    # return coords_df
-                    
-                    
-
-
-
-
                     #tic = time.perf_counter()
                 
                     
-                    #%% Post-processing poolthread
-                    # if thread_post == 1:   ### previous poolthread was running and now needs to be joined
-                        
-                    #     coords_df = async_post.get()  # get the return value from your function.    
-                        
-                    #     poolThread_postprocess.close()
-                    #     poolThread_postprocess.join()   
-                        
-                        
-
-
-                    # ### Initiate poolThread 
-                    
-                    # poolThread_postprocess = ThreadPool(processes=1)
-
-
-                    # ### start post-processing asynchronously
-                    # async_post = poolThread_postprocess.apply_async(box_to_arr_async, (box_coords_all, input_name, input_im, coords_df, input_im, id_c)) # tuple of args for foo
-                    
-                    # thread_post = 1  ### to allow async on next iteration
-
-
-                    # toc = time.perf_counter()
-                    
-                    #print(f"Post-proccesing in {toc - tic:0.4f} seconds")
-                                        
-                
-
 
         
     print('\n\nSegmented outputs saved in folder: ' + sav_dir)

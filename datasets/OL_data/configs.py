@@ -184,7 +184,7 @@ class Configs(DefaultConfigs):
         
         #self.batch_size = 20 if self.dim == 2 else 4
         
-        self.batch_size = 10 if self.dim == 2 else 1
+        self.batch_size = 10 if self.dim == 2 else 2
 
         self.n_cv_splits = 4
         # select modalities from preprocessed data
@@ -718,8 +718,8 @@ class Configs(DefaultConfigs):
       
       
       ### TIGER increased
-      self.n_rpn_features = 512 if self.dim == 2 else 64
-      #self.n_rpn_features = 512 if self.dim == 2 else 512
+      #self.n_rpn_features = 512 if self.dim == 2 else 64
+      self.n_rpn_features = 512 if self.dim == 2 else 512
       
       
       
@@ -764,8 +764,8 @@ class Configs(DefaultConfigs):
       # loss sampling settings.
     
       ### TIGER modified
-      self.rpn_train_anchors_per_image = 300  ### TIGER
-      self.train_rois_per_image = 300 # per batch_instance
+      self.rpn_train_anchors_per_image = 8000  ### TIGER
+      self.train_rois_per_image = 8000 # per batch_instance
       
       
       # self.rpn_train_anchors_per_image = 800  ### TIGER
@@ -882,7 +882,7 @@ class Configs(DefaultConfigs):
       
       ### TIGER - VERY IMPORTANT VALUE HERE... how best to pick this??? Should it be smaller in 2D and larger in 3D?
       
-      self.model_max_instances_per_batch_element = 100 if self.dim == 2 else 200 # per batch element and class
+      self.model_max_instances_per_batch_element = 100 if self.dim == 2 else 300 # per batch element and class
 
       
       #self.detection_nms_threshold = self.model_max_iou_resolution  # needs to be > 0, otherwise all predictions are one cluster.

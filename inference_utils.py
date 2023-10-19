@@ -161,7 +161,7 @@ def split_boxes_by_Voronoi3D(box_coords, vol_shape):
         # a,b,c = np.meshgrid(z_r, x_r, y_r)
         
         
-        coords = np.vstack(np.vstack(np.transpose([a, b,c])))
+        coords = np.vstack([a.ravel(), b.ravel(), c.ravel()]).T  # unravel and transpose
                        
         list_coords.append(coords)
         

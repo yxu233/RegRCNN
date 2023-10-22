@@ -392,7 +392,10 @@ class CombinedLogger(object):
                                                      int(gpu_vals['gpu_graphics_util']),
                                                      *[torch.cuda.memory_allocated(d) / 1024 ** 3 for d in
                                                        range(torch.cuda.device_count())],
-                                                     *[torch.cuda.memory_cached(d) / 1024 ** 3 for d in
+                                                     
+                                                     ### TIGER RENAMED FOR NEWER PYTORCH
+                                                     *[torch.cuda.memory_reserved(d) / 1024 ** 3 for d in
+                                                     #*[torch.cuda.memory_cached(d) / 1024 ** 3 for d in
                                                        range(torch.cuda.device_count())]
                                                      ]
         return self.sysmetrics.loc[len(self.sysmetrics) - 1].to_dict()

@@ -14,3 +14,5 @@ __pycache__/
 
 
 !/assets/*
+*.o
+custom_extensions/*

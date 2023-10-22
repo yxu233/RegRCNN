@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     req_file = "requirements.txt"
     custom_exts = ["nms-extension", "RoIAlign-extension-2D", "RoIAlign-extension-3D"]
-    install_reqs = parse_requirements(req_file, exclude=custom_exts)
+    #install_reqs = parse_requirements(req_file, exclude=custom_exts)
 
     setup(name='RegRCNN',
           version='0.0.2',
@@ -59,7 +59,7 @@ if __name__ == "__main__":
               "Programming Language :: Python :: 3.7"
           ],
           packages=find_packages(exclude=['test', 'test.*']),
-          install_requires=install_reqs,
+          #install_requires=install_reqs,
           )
 
     custom_exts =  ["custom_extensions/nms", "custom_extensions/roi_align/2D", "custom_extensions/roi_align/3D"]

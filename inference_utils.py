@@ -19,9 +19,9 @@ import pandas as pd
 import torch
 
 import utils.exp_utils as utils
-import utils.model_utils as mutils
-from predictor import Predictor
-from evaluator import Evaluator
+#import utils.model_utils as mutils
+#from predictor import Predictor
+#from evaluator import Evaluator
 
 import matplotlib.pyplot as plt
 import tifffile as tiff
@@ -31,23 +31,23 @@ import tifffile as tiff
 import pandas as pd
 pd.set_option('mode.chained_assignment', None)
 
-import shapely
-from shapely.geometry import Polygon, LineString
+#import shapely
+#from shapely.geometry import Polygon, LineString
 
-import warnings
-from shapely.errors import ShapelyDeprecationWarning
-warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning) 
+#import warnings
+#from shapely.errors import ShapelyDeprecationWarning
+#warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning) 
 
 
-import geopandas as gpd       
+#import geopandas as gpd       
 from skimage.draw import polygon, polygon_perimeter, line, line_aa
 import skimage
 import random
 
 import numpy as np
 from scipy.spatial import Voronoi, voronoi_plot_2d, ConvexHull
-import shapely.geometry
-import shapely.ops
+#import shapely.geometry
+#import shapely.ops
 from skimage import measure
 from skimage import morphology
 
@@ -892,25 +892,27 @@ def slice_one(gdf, index, margin, line_mult):
          return inter.geometry.values[0]
          
      return intersection_list(polys)
-                         
-def slice_box(box_A:Polygon, box_B:Polygon, margin=10, line_mult=10):
-     "Returns box_A sliced according to the distance to box_B."
-     vec_AB = np.array([box_B.centroid.x - box_A.centroid.x, box_B.centroid.y - box_A.centroid.y])
-     vec_ABp = np.array([-(box_B.centroid.y - box_A.centroid.y), box_B.centroid.x - box_A.centroid.x])
-     vec_AB_norm = np.linalg.norm(vec_AB)
-     split_point = box_A.centroid + vec_AB/2 - (vec_AB/vec_AB_norm)*margin
-     line = LineString([split_point-line_mult*vec_ABp, split_point+line_mult*vec_ABp])
-     split_box = shapely.ops.split(box_A, line)
-     if len(split_box) == 1: return split_box, None, line
-     is_center = [s.contains(box_A.centroid) for s in split_box]
-     if sum(is_center) == 0: 
-         warnings.warn('Polygon do not contain the center of original box, keeping the first slice.')
-         return split_box[0], None, line
-     where_is_center = np.argwhere(is_center).reshape(-1)[0]
-     where_not_center = np.argwhere(~np.array(is_center)).reshape(-1)[0]
-     split_box_center = split_box[int(where_is_center)]
-     split_box_out = split_box[int(where_not_center)]
-     return split_box_center, split_box_out, line
+         
+
+### DEPRECATED                
+# def slice_box(box_A:Polygon, box_B:Polygon, margin=10, line_mult=10):
+#      "Returns box_A sliced according to the distance to box_B."
+#      vec_AB = np.array([box_B.centroid.x - box_A.centroid.x, box_B.centroid.y - box_A.centroid.y])
+#      vec_ABp = np.array([-(box_B.centroid.y - box_A.centroid.y), box_B.centroid.x - box_A.centroid.x])
+#      vec_AB_norm = np.linalg.norm(vec_AB)
+#      split_point = box_A.centroid + vec_AB/2 - (vec_AB/vec_AB_norm)*margin
+#      line = LineString([split_point-line_mult*vec_ABp, split_point+line_mult*vec_ABp])
+#      split_box = shapely.ops.split(box_A, line)
+#      if len(split_box) == 1: return split_box, None, line
+#      is_center = [s.contains(box_A.centroid) for s in split_box]
+#      if sum(is_center) == 0: 
+#          warnings.warn('Polygon do not contain the center of original box, keeping the first slice.')
+#          return split_box[0], None, line
+#      where_is_center = np.argwhere(is_center).reshape(-1)[0]
+#      where_not_center = np.argwhere(~np.array(is_center)).reshape(-1)[0]
+#      split_box_center = split_box[int(where_is_center)]
+#      split_box_out = split_box[int(where_not_center)]
+#      return split_box_center, split_box_out, line
 
 
 def intersection_list(polylist):

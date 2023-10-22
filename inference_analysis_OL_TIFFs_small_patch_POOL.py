@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 
 import utils.exp_utils as utils
-import utils.model_utils as mutils
+#import utils.model_utils as mutils
 
 import matplotlib.pyplot as plt
 import matplotlib
@@ -28,7 +28,7 @@ from scipy.stats import norm
 from functional.matlab_crop_function import *
 from functional.tree_functions import *  
 
-from predictor import *
+from predictor import apply_wbc_to_patient
 import time
 from multiprocessing.pool import ThreadPool
 from tqdm import tqdm
@@ -362,7 +362,7 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
                 all_lens.append(len(check['coords']))
                 all_coords.append(check['coords'])
             
-            all_coords = np.asarray(all_coords)
+            #all_coords = np.asarray(all_coords)  ### here
             
             min_thresh = 30
             if np.max(all_lens) > min_thresh: ### keep the main object if it's large enough else delete everything by making it so it will 
@@ -372,7 +372,7 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
                 
                 ### delete all objects that are NOT the largest conncected component
                 ind = np.delete(np.arange(len(all_lens)), amax)
-                to_ass = all_coords[ind]
+                to_ass = [all_coords[i] for i in ind]
                 
             else:
                 to_ass = all_coords

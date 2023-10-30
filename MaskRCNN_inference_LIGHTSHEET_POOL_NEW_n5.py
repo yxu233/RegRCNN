@@ -90,12 +90,17 @@ if __name__=="__main__":
         
     cf.fold_dir = os.path.join(cf.exp_dir, 'fold_{}'.format(cf.fold))
     anal_dir = os.path.join(cf.exp_dir, "inference_analysis")
+    
+    
 
     logger = utils.get_logger(cf.exp_dir)
+    
+    ###^^^this causing a lot of output statements later
+    
     model = utils.import_module('model', os.path.join(cf.exp_dir, "model.py"))
     
     
-    
+    #zzz
     torch.backends.cudnn.benchmark = cf.dim == 3
     
 
@@ -183,7 +188,7 @@ if __name__=="__main__":
 
     ### Initiate poolThread
     poolThread_load_data = ThreadPool(processes=1)
-    poolThread_post_process = ThreadPool(processes=1)
+    #poolThread_post_process = ThreadPool(processes=2)
 
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
@@ -305,6 +310,9 @@ if __name__=="__main__":
                 
                 ### for continuing the run
                 for id_c in range(0, len(all_xyzL)):
+                    
+                    #id_c = 248
+                    
                     s_c = all_xyzL[id_c]
                     
                     ### for debug:
@@ -328,8 +336,8 @@ if __name__=="__main__":
                     
 
                     ### get NEXT tile asynchronously!!!
-
-                    async_result = poolThread_load_data.apply_async(get_im, (dset, all_xyzL[id_c + 1], Lpatch_depth, Lpatch_size)) 
+                    if id_c + 1 < len(all_xyzL):   ### but stop once it's reached the end
+                        async_result = poolThread_load_data.apply_async(get_im, (dset, all_xyzL[id_c + 1], Lpatch_depth, Lpatch_size)) 
                     
                     print('one loop')
                     
@@ -416,9 +424,11 @@ if __name__=="__main__":
                     
                     #split_seg = np.zeros([depth_im, width, height])
                     all_xyz = [] 
+                    all_blknum = []
                     
                     
                     all_patches = []
+                    all_output = []
                     
                     batch_size = 1
                     batch_im = []
@@ -453,7 +463,7 @@ if __name__=="__main__":
     
                                    
     
-                                   #all_xyz.append([x, y, z])
+                                   
     
     
                                    
@@ -469,13 +479,9 @@ if __name__=="__main__":
                                    if num_voxels < 300:
                                          #print('skipping: ' + str(s_c))
                                          #print('num voxels with signal: ' + str(num_voxels))
+                                         pbar.update(1)  ### update pbar even if skipped!
                                          continue     
-                                   #else:
-                                   #      print([x, y, z])
-                                   #     plot_max(quad_intensity[0][0], ax=-1)
-                                   #     plt.title('num_voxels')
-                                   
-                                   
+ 
                                    if len(batch_im) > 0:
                                        batch_im = np.concatenate((batch_im, quad_intensity))
                                    else:
@@ -497,86 +503,10 @@ if __name__=="__main__":
                                                  'patient_class_targets': np.asarray([]), 'pid': ['0']}
                                        
     
-                                       output = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
-                                       
-    
-                                       ### Add box patch factor
-                                       new_box_list = []
-                                       tmp_check = np.zeros(np.shape(quad_intensity[0][0]))
-                                       for bid, box in enumerate(output['boxes'][0]):
-                                            """ 
-                                           
-                                           
-                                                Some bounding boxes have no associated segmentations!!! Skip these
-                                           
-                                           
-                                           
-                                            """
-                                            if len(box['mask_coords']) == 0:
-                                                continue
-                                                                                
-                                            ### Only add if above threshold
-                                            if box['box_score'] > thresh:
-                                                c = box['box_coords']
-    
-                                                box_centers = [(c[ii] + c[ii + 2]) / 2 for ii in range(2)]
-                                                box_centers.append((c[4] + c[5]) / 2)
-    
-                                                # factor = np.mean([norm.pdf(bc, loc=pc, scale=pc * 0.8) * np.sqrt(2 * np.pi) * pc * 0.8 for bc, pc in \
-                                                #                   zip(box_centers, np.array(quad_intensity[0][0].shape) / 2)]
-                                                # slightly faster call
-                                                pc =  np.array(quad_intensity[0][0].shape) / 2
-                                                factor = np.mean([norm.pdf(box_centers, loc=pc, scale=pc * 0.8) * np.sqrt(2 * np.pi) * pc * 0.8 ])
-                                                    
-                                                    
-                                                box['box_patch_center_factor'] = factor
-                                                new_box_list.append(box)     
-                                               
-              
-                                       
-                                       output['boxes'] = [new_box_list]
-                                       results_dict = output
-                                   
-        
+                                       output = net.test_forward(batch, main_brain=True) #seg preds are only seg_logits! need to take argmax.
+                                                                        
+                                       all_output.append(output)
 
-        
-                                       if 'seg_preds' in results_dict.keys():
-                                            results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
-                                           # results_dict['colored_boxes'] = np.expand_dims(results_dict['colored_boxes'][:, 1, :, :, :], axis=0)
-                                            
-                                       ### Add to segmentation
-                                       seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
-                                       
-                                       #color_im = np.moveaxis(results_dict['colored_boxes'], -1, 1) 
-                                       segmentation[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] = segmentation[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] + seg_im[0, :, 0, :, :]
-                                       #colored_im[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] = color_im[0, :, 0, :, :]
-                                       
-                                       for bs in range(batch_size):
-        
-                                           # box_df = results_dict['boxes'][bs]
-                                           # box_vert = []
-                                           # box_score = []
-                                           # mask_coords = []
-                                           # for box in box_df:
-                                              
-                                           #         box_vert.append(box['box_coords'])
-                                           #         box_score.append(box['box_score'])
-                                           #         mask_coords.append(box['mask_coords'])
-                                                   
-                                           # if len(box_vert) == 0:
-                                           #     continue
-            
-            
-                                           patch_im = batch_im[bs][0]
-                                           #patch_im = np.moveaxis(patch_im, -1, 0)   ### must be depth first
-                                        
-                                           # save memory by deleting seg_preds
-                                           results_dict['seg_preds'] = []
-                        
-                                           all_patches.append({ 'results_dict': results_dict, 'total_blocks': bs % total_blocks + (total_blocks - batch_size), 
-                                                                 #'focal_cube':focal_cube, 'patch_im': patch_im, 'box_vert':box_vert, 'mask_coords':mask_coords
-                                                                'xyz':batch_xyz[bs]})
-              
                                            
                                        ### Reset batch
                                        batch_im = []
@@ -585,27 +515,202 @@ if __name__=="__main__":
                                        #patch = np.moveaxis(quad_intensity, -1, 1)
                                        #save = np.concatenate((patch, seg_im), axis=2)
                                        
+                                       all_xyz.append([x, y, z])
+                                       all_blknum.append(total_blocks)
+                                       
                                        pbar.update(1)
 
                     pbar.close()
+                    #zzz
                     
-                    
+
                     toc = time.perf_counter()
                     
-                    print(f"MaskRCNN analysis in {toc - tic:0.4f} seconds")                    
+                    print(f"MaskRCNN analysis in {toc - tic:0.4f} seconds")     
+
+
+                    #%% Process in parallel outputs to extract result_dict
+                    def parse_outputs_to_coords(kwargs):
+                        #print(kwargs)
+                        
+                        output = kwargs[0]
+                        xyz_patch = kwargs[1]
+                        thresh = kwargs[2]
+                        blk_num = kwargs[3]
+                        
+                        #print(output.shape)
+                        #print(blk_num)
+                        
+                        
+                        results_dict = net.get_results(img_shape=output[0], detections=output[1], 
+                                                       detection_masks=output[2], return_masks=output[3]) 
+                        im_shape = output[0]
+     
+                        ### Add box patch factor
+                        new_box_list = []
+                        tmp_check = np.zeros(im_shape[2:])
+                        
+                        for bid, box in enumerate(results_dict['boxes'][0]):
+                              """ 
+                              
+                                  Some bounding boxes have no associated segmentations!!! Skip these
+    
+                              """
+                              if len(box['mask_coords']) == 0:
+                                  continue
+                                                                 
+                              ### Only add if above threshold
+                              if box['box_score'] > thresh:
+                                  c = box['box_coords']
+     
+                                  box_centers = [(c[ii] + c[ii + 2]) / 2 for ii in range(2)]
+                                  box_centers.append((c[4] + c[5]) / 2)
+     
+                                  # factor = np.mean([norm.pdf(bc, loc=pc, scale=pc * 0.8) * np.sqrt(2 * np.pi) * pc * 0.8 for bc, pc in \
+                                  #                   zip(box_centers, np.array(quad_intensity[0][0].shape) / 2)]
+                                  # slightly faster call
+                                  pc =  np.array(im_shape[2:]) / 2
+                                  factor = np.mean([norm.pdf(box_centers, loc=pc, scale=pc * 0.8) * np.sqrt(2 * np.pi) * pc * 0.8 ])
+                                     
+                                     
+                                  box['box_patch_center_factor'] = factor
+                                  new_box_list.append(box)     
+                                
+       
+                        
+                        results_dict['boxes'] = [new_box_list]
+                        #results_dict = results_dict
+                    
+     
+    
+     
+                        if 'seg_preds' in results_dict.keys():
+                              results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
+                            # results_dict['colored_boxes'] = np.expand_dims(results_dict['colored_boxes'][:, 1, :, :, :], axis=0)
+                             
+                        ### Add to segmentation
+                        seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
+                        
+                        
+                        ### get coords so can plot into segmentation later
+                        coords = np.transpose(np.where(seg_im[0, :, 0, :, :] > 0))
+                        
+                        coords[:, 0] = coords[:, 0] + xyz_patch[2]
+                        coords[:, 1] = coords[:, 1] + xyz_patch[0]
+                        coords[:, 2] = coords[:, 2] + xyz_patch[1]
+                        
+                        #color_im = np.moveaxis(results_dict['colored_boxes'], -1, 1) 
+                        #segmentation[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] = segmentation[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] + seg_im[0, :, 0, :, :]
+                        #colored_im[z:z + patch_depth,  x:x + patch_size, y:y + patch_size] = color_im[0, :, 0, :, :]
+                        
+                        
+                        ### add option for larger batching?
+                        #for bs in range(batch_size):
+ 
+                        # box_df = results_dict['boxes'][bs]
+                        # box_vert = []
+                        # box_score = []
+                        # mask_coords = []
+                        # for box in box_df:
+                           
+                        #         box_vert.append(box['box_coords'])
+                        #         box_score.append(box['box_score'])
+                        #         mask_coords.append(box['mask_coords'])
+                                
+                        # if len(box_vert) == 0:
+                        #     continue
+ 
+ 
+                        #patch_im = batch_im[bs][0]
+                        #patch_im = np.moveaxis(patch_im, -1, 0)   ### must be depth first
+                     
+                        # save memory by deleting seg_preds
+                        results_dict['seg_preds'] = []
+     
+                        # all_patches.append({ 'results_dict': results_dict, 'total_blocks': bs % total_blocks + (total_blocks - batch_size), 
+                        #                       #'focal_cube':focal_cube, 'patch_im': patch_im, 'box_vert':box_vert, 'mask_coords':mask_coords
+                        #                       'xyz':xyz_patch})
+   
+                        #all_patches.append({ 'results_dict': results_dict, 'total_blocks': total_blocks, 
+                        #                      #'focal_cube':focal_cube, 'patch_im': patch_im, 'box_vert':box_vert, 'mask_coords':mask_coords
+                        #                      'xyz':xyz_patch})
+                        
+                        
+                        return results_dict, blk_num, xyz_patch, coords
+    
+                        
+                    tic = time.perf_counter()
+                    ### add x,y,z and save segmentation
+                    kwargs = zip(all_output, all_xyz, [thresh] * len(all_xyz), all_blknum)
                     
                     
+                    #kwargs = {'output':all_output, 'xyz_patch':all_xyz, 'thresh':[thresh]*len(all_xyz), 'total_blocks':[total_blocks]*len(all_xyz)}
+                        
+                    exec_results = concurrent.futures.ThreadPoolExecutor(10)
+                    results = list(tqdm(exec_results.map(parse_outputs_to_coords, kwargs), total=len(all_output)))
+                    exec_results.shutdown(wait=True)
+                    
+                    toc = time.perf_counter()
+                    print(f"Parse output coords in {toc - tic:0.4f} seconds")     
+                    
+                    
+                    seg_coords = []
+                    for result in results:
+                        all_patches.append({ 'results_dict': result[0], 'total_blocks': result[1], 
+                                              #'focal_cube':focal_cube, 'patch_im': patch_im, 'box_vert':box_vert, 'mask_coords':mask_coords
+                                              'xyz':result[2]})
+                        seg_coords.append(result[3])
+                    
+                    ### plot to make segmentation array with overlapping regions showing
+                    for coords in seg_coords:
+                        ### create segmentation image
+                        segmentation[coords[:, 0], coords[:, 1], coords[:, 2]] = segmentation[coords[:, 0], coords[:, 1], coords[:, 2]] + 1
+                    
+                    # pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+                    # result = pool.map(parse_outputs_to_coords, cc)
+                    # pool.shutdown(wait=True)
+
+
+                    # def parse_outputs_to_coords(output, xyz_patch, thresh, total_blocks):
+                        
+                        
+                    #zzz
+
+    
+    
+
+                    #%% Post-process boxes       
+                    
+                    ### First save the files and remove them from RAM so we don't max out
+                    print('saving files')                                 
+                    im_size = np.shape(input_im);
+                    
+                    filename = input_name.split('/')[-1].split('.')[0:-1]
+                    filename = '.'.join(filename)
+                
+                    input_im = np.expand_dims(input_im, axis=0)
+                    input_im = np.expand_dims(input_im, axis=2)
+                    tiff.imwrite(sav_dir + filename + '_' + str(int(id_c)) +'_input_im.tif', np.asarray(input_im, dtype=np.uint16),
+                                          imagej=True, #resolution=(1/XY_res, 1/XY_res),
+                                          metadata={'spacing':1, 'unit': 'um', 'axes': 'TZCYX'})  
+                                                 
+                
+                    segmentation = np.asarray(segmentation, np.uint8)
+                    tiff.imwrite(sav_dir + filename + '_' + str(int(id_c)) +'_segmentation_overlap3.tif', segmentation)                    
                     #post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patches, patch_size, patch_depth, id_c, focal_cube, s_c, debug)
                     
+                    
+                    #zzz
+                    ### Then call asynchronous post-processing to sort out boxes
                     if called:
-                        executor.submit(post_process_async, cf, input_im, segmentation, input_name, sav_dir, all_patches, 
-                                                                 patch_im, patch_size, patch_depth, id_c, focal_cube, s_c=s_c, debug=debug)
+                        executor.submit(post_process_async, cf, all_patches, im_size, filename, sav_dir,
+                                                                 patch_size, patch_depth, id_c, focal_cube, s_c=s_c, debug=debug)
                     
                     else:
                         executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
                         
-                        executor.submit(post_process_async, cf, input_im, segmentation, input_name, sav_dir, all_patches, 
-                                                                 patch_im, patch_size, patch_depth, id_c, focal_cube, s_c=s_c, debug=debug)
+                        executor.submit(post_process_async, cf, all_patches, im_size, filename, sav_dir,
+                                                                 patch_size, patch_depth, id_c, focal_cube, s_c=s_c, debug=debug)
                         
                         called = 1
                     
@@ -629,15 +734,13 @@ if __name__=="__main__":
                     
                     #tic = time.perf_counter()
                 
-                    
 
-        
     print('\n\nSegmented outputs saved in folder: ' + sav_dir)
     
     
     ### REMEMBER TO CLOSE POOL THREADS
     poolThread_load_data.close()
-    poolThread_post_process.close()    
+    #poolThread_post_process.close()    
     
     
     

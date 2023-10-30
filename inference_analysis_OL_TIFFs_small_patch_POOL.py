@@ -94,24 +94,28 @@ def expand_add_stragglers(to_assign, clean_labels):
 
 """ ***update this so it prints to a log file instead of to the terminal all this garbage"""
 
-def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patches, patch_im, patch_size, patch_depth, file_num, focal_cube, s_c=0, debug=0):
+def post_process_async(cf, all_patches, im_size, filename, sav_dir, patch_size, patch_depth, file_num, focal_cube, s_c=0, debug=0):
     print('run async for: ' + str(file_num))
     
     
-    im_size = np.shape(input_im); width = im_size[1];  height = im_size[2]; depth_im = im_size[0];
+    #im_size = np.shape(input_im); 
+    width = im_size[1];  height = im_size[2]; depth_im = im_size[0];
     
-    filename = input_name.split('/')[-1].split('.')[0:-1]
-    filename = '.'.join(filename)
+    #filename = input_name.split('/')[-1].split('.')[0:-1]
+    #filename = '.'.join(filename)
 
-    input_im = np.expand_dims(input_im, axis=0)
-    input_im = np.expand_dims(input_im, axis=2)
-    tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_input_im.tif', np.asarray(input_im, dtype=np.uint16),
-                          imagej=True, #resolution=(1/XY_res, 1/XY_res),
-                          metadata={'spacing':1, 'unit': 'um', 'axes': 'TZCYX'})  
+    # input_im = np.expand_dims(input_im, axis=0)
+    # input_im = np.expand_dims(input_im, axis=2)
+    # tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_input_im.tif', np.asarray(input_im, dtype=np.uint16),
+    #                       imagej=True, #resolution=(1/XY_res, 1/XY_res),
+    #                       metadata={'spacing':1, 'unit': 'um', 'axes': 'TZCYX'})  
                                  
 
-    segmentation = np.asarray(segmentation, np.int32)
-    tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_segmentation_overlap3.tif', segmentation)
+    # segmentation = np.asarray(segmentation, np.uint8)
+    # tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_segmentation_overlap3.tif', segmentation)
+    
+    ### READ SEGMENTATION FROM SAVED FILE
+    segmentation = tiff.imread(sav_dir + filename + '_' + str(int(file_num)) +'_segmentation_overlap3.tif')
 
     #if debug:
         #colored_im = np.asarray(colored_im, np.int32)
@@ -119,7 +123,7 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
     
     
     ### Cleanup
-    colored_im = []; input_im = []; new_dim_im = []
+    #colored_im = []; input_im = []; new_dim_im = []
 
     #%% For bounding box approach - SPEED UP
     print('wbc clustering for ' + str(len(all_patches)) + ' number of patches')
@@ -252,8 +256,8 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
     #%% For KNN based assignment of voxels to split boxes
     
     print('Splitting boxes with KNN')
-    patch_depth = patch_im.shape[0]
-    patch_size = patch_im.shape[1]
+    #patch_depth = patch_im.shape[0]
+    #patch_size = patch_im.shape[1]
 
     box_vert = []
     for box in out[0]:
@@ -408,26 +412,31 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
     print(f"Step 1 in {toc - tic:0.4f} seconds")
     
     #%% ## Expand each leftover segmentation piece to be a part of the neighborhood!
-    print('Step 2: Cleaning up neighborhoods')
+    # print('Step 2: Cleaning up neighborhoods')
     
-    bw_seg = segmentation
-    bw_seg[bw_seg > 0] = 1
-    bw_seg[clean_labels > 0] = 0
+    # bw_seg = segmentation
+    # bw_seg[bw_seg > 0] = 1
+    # bw_seg[clean_labels > 0] = 0
     
     
-    stragglers = measure.label(bw_seg)
-    clean_labels = expand_add_stragglers(stragglers, clean_labels)
-    ### Cleanup
-    bw_seg = []; stragglers = []
-    if debug:
-        tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_ass_step2.tif', clean_labels)                      
+    # stragglers = measure.label(bw_seg)
+    # clean_labels = expand_add_stragglers(stragglers, clean_labels)
+    # ### Cleanup
+    # bw_seg = []; stragglers = []
+    # if debug:
+    #     tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_ass_step2.tif', clean_labels)                      
     
     
     #%% ## Also clean up small objects and add them to nearest object that is large - ### SLOW!!!
+    
+    #tic = time.perf_counter()
     print('Step 3: Cleaning up adjacent objects')
     min_size = 80
     all_obj = measure.regionprops(clean_labels)
     small = np.zeros(np.shape(clean_labels))
+    
+    print(len(all_obj))
+    
     counter = 1
     for o_id, obj in enumerate(all_obj):
         c = obj['coords']
@@ -435,7 +444,12 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
         if len(c) < min_size:
             small[c[:, 0], c[:, 1], c[:, 2]] = counter
             counter += 1
+ 
         
+    #toc = time.perf_counter()
+    #print(f"clean up adjacent objects in {toc - tic:0.4f} seconds")                
+         
+    
     #small = np.asarray(small, np.int32)
     clean_labels[small > 0] = 0   ### must remember to mask out all the small areas otherwise will get reassociated back with the small area!
     clean_labels = expand_add_stragglers(small, clean_labels)
@@ -452,6 +466,8 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
 
 
     #%% ## Also go through Z-slices and remove any super thin sections in XY? Like < 10 pixels
+    
+    
     print('Step 4: Cleaning up z-stragglers')
     count = 0
     for zid, zslice in enumerate(clean_labels):
@@ -465,9 +481,8 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
     if debug:
         tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_ass_step4_FOCAL.tif', clean_labels)           
     
-    
+
     ### Also remove super large objects?
-    
     
     
     
@@ -479,7 +494,7 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
     shifted = shift_im[:-1, :-1, :-1]
     
     shifted = np.asarray(shifted, np.int32)
-    tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_shfited.tif', shifted)    
+    tiff.imwrite(sav_dir + filename + '_' + str(int(file_num)) +'_shifted.tif', shifted)    
 
 
     ### Cleanup
@@ -491,20 +506,73 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
             
 
     #%% """ Also save list of coords of where the cells are located so that can easily access later (or plot without making a whole image!) """
-    # print('\nsaving coords')
-    # tic = time.perf_counter()
-    # #from skimage import measure
-    # #labels = measure.label(segmentation)
-    # #blobs_labels = measure.label(blobs, background=0)
-    # cc = measure.regionprops(shifted)
+    print('\nsaving coords')
+    tic = time.perf_counter()
+    
+    #from skimage import measure
+    #labels = measure.label(segmentation)
+    #blobs_labels = measure.label(blobs, background=0)
+    cc = measure.regionprops(shifted, cache=False)
+    
+    #cc_table = measure.regionprops_table(shifted, properties=('centroids', 'coords'))
+
+    
+    ########################## TOO SLOW TO USE APPEND TO ADD EACH ROW!!!
+    ######################### MUCH FASTER TO JUST MAKE A DICTIONARY FIRST, AND THEN CONVERT TO DATAFRAME AND CONCAT
+    #tic = time.perf_counter()
+    d = {}
+    
+    #d = {'offset': s_c, 'block_num': file_num}'
+    
+    #all_c = []
+    #all_coords = []
+    #all_sc = []
+    
+    # for i in range(len(cd)):
+        
+    #     c = cd[i]['centroid']
+    #     print(i)
+    #     cd[i] = []
     
     
-    # ########################## TOO SLOW TO USE APPEND TO ADD EACH ROW!!!
-    # ######################### MUCH FASTER TO JUST MAKE A DICTIONARY FIRST, AND THEN CONVERT TO DATAFRAME AND CONCAT
-    # d = {}
-    # for i_list, cell in enumerate(cc):
+    for i_list, cell in enumerate(cc):
+        
+        #tic = time.perf_counter()
+        center = cell['centroid']
+        center = [round(center[0]), round(center[1]), round(center[2])]
+        
+        coords = cell['coords']
+        coords_raw = np.copy(coords)
+
+
+        coords[:, 0] = coords[:, 0] + s_c[2]
+        coords[:, 1] = coords[:, 1] + s_c[1]
+        coords[:, 2] = coords[:, 2] + s_c[0]
+        
+        coords = np.roll(coords, -1)  ### so that EVERYTHING is in XYZ format
+        #print(i_list)
+        
+        
+        ### BE CAREFUL - every new cell[parameter] requires heavy computation time from regionprops
+        d[i_list] = {'xyz_offset': s_c, 'block_num': file_num, 
+                'Z': center[0], 'X': center[1], 'Y': center[2],
+                'Z_scaled': center[0] + s_c[2], 'X_scaled': center[1] + s_c[1], 'Y_scaled': center[2] + s_c[0],
+                #'equiv_diam': cell['equivalent_diameter'], 
+                #'vol': cell['area'], 
+                'coords_raw':coords_raw, 
+                'coords_scaled':coords}
+        
+        cc[i_list] = []   ### need to manually garbage collect to prevent regionprops from caching and using up 100% RAM
+        
+        #print(i_list)
+        
+        
+    # def cell_list(cell): 
+    #     #tic = time.perf_counter()
     #     center = cell['centroid']
     #     center = [round(center[0]), round(center[1]), round(center[2])]
+        
+        
         
         
     #     coords = cell['coords']
@@ -515,26 +583,48 @@ def post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patc
     #     coords[:, 1] = coords[:, 1] + s_c[1]
     #     coords[:, 2] = coords[:, 2] + s_c[0]
         
-    #     d[i_list] = {'offset': s_c, 'block_num': file_num, 
+    #     d = {#'offset': s_c, 'block_num': file_num, 
     #             'Z': center[0], 'X': center[1], 'Y': center[2],
     #             'Z_scaled': center[0] + s_c[2], 'X_scaled': center[1] + s_c[1], 'Y_scaled': center[2] + s_c[0],
     #             'equiv_diam': cell['equivalent_diameter'], 'vol': cell['area'], 'coords_raw':coords_raw, 'coords_scaled':coords}
+    #     print(center)
+        
+        
+    #     return d
+        
+    
+        
+    # pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    # result = pool.map(cell_list, cc)
+    # pool.shutdown(wait=True)
+
+    toc = time.perf_counter()
+    print(f"Extracting coords in {toc - tic:0.4f} seconds")     
+        
         
        
-    # df = pd.DataFrame.from_dict(d, "index")
-    # #coords_df = pd.concat([coords_df, df])           
+    df = pd.DataFrame.from_dict(d, "index")
+    #coords_df = pd.concat([coords_df, df])           
                             
-    # #toc = time.perf_counter()
     
-    # np.save(sav_dir + filename + '_' + str(int(file_num)) + '_numpy_arr', df)
-    # #print(f"Save coords in {toc - tic:0.4f} seconds \n\n")
+    df.to_pickle(sav_dir + filename + '_' + str(int(file_num)) + '_df.pkl')
     
-    # #print('Saved asynchronously')
+    #a = pd.read_pickle(sav_dir + filename + '_' + str(int(file_num)) + '_df.pkl')
+    
+    
+    #toc = time.perf_counter()
+    
+    #np.save(sav_dir + filename + '_' + str(int(file_num)) + '_numpy_arr', df)
+    #print(f"Save coords in {toc - tic:0.4f} seconds \n\n")
+    
+    #print('Saved asynchronously')
                         
+    #a = np.load(sav_dir + filename + '_' + str(int(file_num)) + '_numpy_arr.npy')
 
-    # toc = time.perf_counter()
-    # print(f"Saving coords in {toc - tic:0.4f} seconds")                
-        
+
+    #toc = time.perf_counter()
+    #print(f"Saving coords in {toc - tic:0.4f} seconds")                
+    print('DONE')    
     
     ### Cleanup
     shifted = [];

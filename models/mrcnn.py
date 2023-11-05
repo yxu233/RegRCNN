@@ -1060,7 +1060,7 @@ class net(nn.Module):
         return results_dict
 
 
-    def test_forward(self, batch, return_masks=True):
+    def test_forward(self, batch, return_masks=True, main_brain=False):
         """
         test method. wrapper around forward pass of network without usage of any ground truth information.
         prepares input data for processing and stores outputs in a dictionary.
@@ -1072,8 +1072,23 @@ class net(nn.Module):
                'seg_preds': pixel-wise class predictions (b, 1, y, x, (z)) with values [0, n_classes]
         """
         img = batch['data']
+        shape = img.shape
+        
         img = torch.from_numpy(img).float().cuda()
         _, _, _, detections, detection_masks = self.forward(img)
-        results_dict = self.get_results(img.shape, detections, detection_masks, return_masks=return_masks)
+        
+        ### TIGER: -- if doing whole brain analysis, skip this step and run later
+        if not main_brain:
+            results_dict = self.get_results(img.shape, detections, detection_masks, return_masks=return_masks)
+        else:
+            
+            ### remove from CUDA to not build up GPU memory
+            detections = detections.cpu().data.numpy()
+            if self.cf.dim == 2:
+                detection_masks = detection_masks.permute(0, 2, 3, 1).cpu().data.numpy()
+            else:
+                detection_masks = detection_masks.permute(0, 2, 3, 4, 1).cpu().data.numpy()
+
+            results_dict = [shape, detections, detection_masks, return_masks]
 
         return results_dict

@@ -182,7 +182,7 @@ if __name__=="__main__":
 
                   ### For new .n5 files!
                   '/media/user/c0781205-1cf9-4ece-b3d5-96dd0fbf4a78/20231012_M230_MoE_PVCre_SHIELD_delip_RIMS_RI_1500_3days_5x/M230_fused/'
-                  
+                  #'/media/user/c0781205-1cf9-4ece-b3d5-96dd0fbf4a78/20231012_M223_MoE_Ai9_SHIELD_CUBIC_RIMS_RI_1500_3days_5x/M223_fused/'
                   ]
     
 
@@ -193,7 +193,7 @@ if __name__=="__main__":
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
         foldername = input_path.split('/')[-2]
-        sav_dir = input_path + '/' + foldername + '_MaskRCNN_NEW_ASYNC'
+        sav_dir = input_path + '/' + foldername + '_MaskRCNN_patches'
     
 
         """ For testing ILASTIK images """
@@ -272,28 +272,37 @@ if __name__=="__main__":
                 thread_post = 0
                 called = 0
                 
-                for z in range(0, depth_imL + Lpatch_depth, round(Lpatch_depth)):
-                    if z + Lpatch_depth > depth_imL:  continue
+                for z in range(0, depth_imL, round(Lpatch_depth)):
+                    #if z + Lpatch_depth > depth_imL:  continue
 
-                    for x in range(0, widthL + Lpatch_size, round(Lpatch_size)):
-                          if x + Lpatch_size > widthL:  continue
+                    for x in range(0, widthL, round(Lpatch_size)):
+                          #if x + Lpatch_size > widthL:  continue
 
-                          for y in range(0, heightL + Lpatch_size, round(Lpatch_size)):
-                               if y + Lpatch_size > heightL: continue
+                          for y in range(0, heightL, round(Lpatch_size)):
+                               #if y + Lpatch_size > heightL: continue
 
-                               print([x, y, z])
-
+                               #print([x, y, z]
                                all_xyzL.append([x, y, z])
                                
-                                
-            
+
                 ### how many total blocks to analyze:
                 #print(len(all_xyzL))
                     
                 def get_im(dset, s_c, Lpatch_depth, Lpatch_size):
                     
                         #tic = time.perf_counter()
-                        input_im = dset[s_c[2]:s_c[2] + Lpatch_depth, s_c[1]:s_c[1] + Lpatch_size, s_c[0]:s_c[0] + Lpatch_size]
+                        
+                        ### If nearing borders of image, prevent going out of bounds!
+                        z_top = s_c[2] + Lpatch_depth
+                        if z_top >= dset.shape[0]: z_top = dset.shape[0]
+                        
+                        y_top = s_c[1] + Lpatch_size
+                        if y_top >= dset.shape[1]: y_top = dset.shape[1]
+                        
+                        x_top = s_c[0] + Lpatch_size
+                        if x_top >= dset.shape[2]: x_top = dset.shape[2]
+                        
+                        input_im = dset[s_c[2]:z_top, s_c[1]:y_top, s_c[0]:x_top]
                         og_shape = input_im.shape
                         
                         #toc = time.perf_counter()
@@ -309,22 +318,19 @@ if __name__=="__main__":
                     
                 
                 ### for continuing the run
-                for id_c in range(0, len(all_xyzL)):
+                for id_c in range(232, len(all_xyzL)):
                     
                     #id_c = 248
                     
                     s_c = all_xyzL[id_c]
-                    
+
                     ### for debug:
                     #s_c = all_xyz[10]
-                    
-                    
-
                     tic = time.perf_counter()
                     
          
                     ### Load first tile normally, and then the rest as asynchronous processes
-                    if id_c == 0:
+                    if id_c == 232:
                         input_im, og_shape = get_im(dset, s_c, Lpatch_depth, Lpatch_size)
                         print('loaded normally')
                         
@@ -461,12 +467,7 @@ if __name__=="__main__":
                               for y in range(0, height + patch_size, round(step_xy)):
                                    if y + patch_size > height: continue
     
-                                   
-    
-                                   
-    
-    
-                                   
+ 
                                    quad_intensity = input_im[z:z + patch_depth,  x:x + patch_size, y:y + patch_size];  
                                    quad_intensity = np.moveaxis(quad_intensity, 0, -1)
                                    quad_intensity = np.asarray(np.expand_dims(np.expand_dims(quad_intensity, axis=0), axis=0), dtype=np.float16)
@@ -703,13 +704,13 @@ if __name__=="__main__":
                     #zzz
                     ### Then call asynchronous post-processing to sort out boxes
                     if called:
-                        executor.submit(post_process_async, cf, all_patches, im_size, filename, sav_dir,
+                        executor.submit(post_process_async, cf, all_patches, im_size, filename, sav_dir, overlap_pxy, overlap_pz,
                                                                  patch_size, patch_depth, id_c, focal_cube, s_c=s_c, debug=debug)
                     
                     else:
                         executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
                         
-                        executor.submit(post_process_async, cf, all_patches, im_size, filename, sav_dir,
+                        executor.submit(post_process_async, cf, all_patches, im_size, filename, sav_dir, overlap_pxy, overlap_pz,
                                                                  patch_size, patch_depth, id_c, focal_cube, s_c=s_c, debug=debug)
                         
                         called = 1

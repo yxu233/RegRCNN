@@ -94,7 +94,7 @@ def expand_add_stragglers(to_assign, clean_labels):
 
 """ ***update this so it prints to a log file instead of to the terminal all this garbage"""
 
-def post_process_async(cf, all_patches, im_size, filename, sav_dir, patch_size, patch_depth, file_num, focal_cube, s_c=0, debug=0):
+def post_process_async(cf, all_patches, im_size, filename, sav_dir, overlap_pxy, overlap_pz, patch_size, patch_depth, file_num, focal_cube, s_c=0, debug=0):
     print('run async for: ' + str(file_num))
     
     
@@ -559,6 +559,7 @@ def post_process_async(cf, all_patches, im_size, filename, sav_dir, patch_size, 
                 'Z_scaled': center[0] + s_c[2], 'X_scaled': center[1] + s_c[1], 'Y_scaled': center[2] + s_c[0],
                 #'equiv_diam': cell['equivalent_diameter'], 
                 #'vol': cell['area'], 
+                'overlap_pxy':overlap_pxy, 'overlap_pz':overlap_pz,
                 'coords_raw':coords_raw, 
                 'coords_scaled':coords}
         

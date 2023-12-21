@@ -437,13 +437,14 @@ def post_process_async(cf, all_patches, im_size, filename, sav_dir, overlap_pxy,
     
     print(len(all_obj))
     
-    counter = 1
+    #counter = 1
     for o_id, obj in enumerate(all_obj):
         c = obj['coords']
+        obj_label = obj['label']
         
         if len(c) < min_size:
-            small[c[:, 0], c[:, 1], c[:, 2]] = counter
-            counter += 1
+            small[c[:, 0], c[:, 1], c[:, 2]] = obj_label
+            #counter += 1
  
         
     #toc = time.perf_counter()
@@ -552,6 +553,14 @@ def post_process_async(cf, all_patches, im_size, filename, sav_dir, overlap_pxy,
         coords = np.roll(coords, -1)  ### so that EVERYTHING is in XYZ format
         #print(i_list)
         
+        
+        ### check if anything is non-sequential
+        # l = coords_raw[:, 1]
+        # if not sorted(np.unique(l))== list(range(min(l), max(l)+1)):
+        #     print('NOT SEQUENTIAL')
+        #     print(cell['label'])
+            # zzz
+
         
         ### BE CAREFUL - every new cell[parameter] requires heavy computation time from regionprops
         d[i_list] = {'xyz_offset': s_c, 'block_num': file_num, 

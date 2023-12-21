@@ -841,7 +841,7 @@ class Predictor:
         #has seg probs in entry 'seg_preds'
 
         if self.mode == 'val':
-            for b in range(batch['patient_bb_target'].shape[0]):
+            for b in range(len(batch['patient_bb_target'])): ### TIGER - changed from .shape to len() instead since can no longer combine arrays of differing sizes
                 for t in range(len(batch['patient_bb_target'][b])):
                     gt_box = {'box_type': 'gt', 'box_coords': batch['patient_bb_target'][b][t],
                               'class_targets': batch['patient_class_targets'][b][t]}

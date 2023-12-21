@@ -166,11 +166,8 @@ class BatchGenerator(dutils.BatchGenerator):
             
             
             
-            
-            
-            
-            
-            
+            #print(seg)
+            #print(len(seg))
             
             
 
@@ -302,7 +299,15 @@ class BatchGenerator(dutils.BatchGenerator):
         
         
         for key,val in batch_roi_items.items(): #extend batch dic by entries of observables dic
-            batch[key] = np.array(val)
+            # print(patient)
+            # #print(len(val))
+            # #print(val.shape)
+            # print(key)
+            # print(val)
+            # print('yo')
+            #val = np.asarray(val)  ### TIGER - added dtype=object after upgrading pandas and numpy
+        
+            batch[key] = val ### TIGER - removed np.array() after upgrading pandas and numpy since you can no longer force to be an array of differing sizes
 
         return batch
 

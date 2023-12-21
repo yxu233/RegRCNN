@@ -430,9 +430,9 @@ class CombinedLogger(object):
     def sysmetrics_start(self, interval):
         if interval is not None and interval > 0:
             self.sysmetrics_interval = interval
-            self.gpu_logger = Nvidia_GPU_Logger()
-            self.sysmetrics_start_time = time.time()
-            self.sys_metrics_process = split_off_process(target=self.sysmetrics_loop, daemon=True)
+            # self.gpu_logger = Nvidia_GPU_Logger()
+            # self.sysmetrics_start_time = time.time()
+            # self.sys_metrics_process = split_off_process(target=self.sysmetrics_loop, daemon=True)
             
             
             ### TIGER - dont do pooled threading here so can debug

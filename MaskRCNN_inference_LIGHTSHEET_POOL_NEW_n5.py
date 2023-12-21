@@ -66,8 +66,8 @@ if __name__=="__main__":
 
             self.dataset_name = "datasets/OL_data"
             #self.exp_dir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/94) newest_CLEANED_shrunk_det_thresh_02_min_conf_01/'
-            self.exp_dir = '/media/user/fa2f9451-069e-4e2f-a29b-3f1f8fb64947/Training_checkpoints_RegRCNN/96) new_FOV_data_det_thresh_09_check_300'
-            
+            #self.exp_dir = '/media/user/fa2f9451-069e-4e2f-a29b-3f1f8fb64947/Training_checkpoints_RegRCNN/96) new_FOV_data_det_thresh_09_check_300'
+            self.exp_dir = '/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/Training_checkpoints_RegRCNN/96) new_FOV_data_det_thresh_09_check_300'
             
             self.server_env = False
 
@@ -181,8 +181,22 @@ if __name__=="__main__":
                   #'/media/user/FantomHD/20220813_M103_MoE_Tie2Cre_Cuprizone_6_weeks_RI_14614_3dayhot_7daysRIMSRT/BDV/BDV_BrainReg/to_reg/'
 
                   ### For new .n5 files!
-                  '/media/user/c0781205-1cf9-4ece-b3d5-96dd0fbf4a78/20231012_M230_MoE_PVCre_SHIELD_delip_RIMS_RI_1500_3days_5x/M230_fused/'
-                  #'/media/user/c0781205-1cf9-4ece-b3d5-96dd0fbf4a78/20231012_M223_MoE_Ai9_SHIELD_CUBIC_RIMS_RI_1500_3days_5x/M223_fused/'
+                  #'/media/user/c0781205-1cf9-4ece-b3d5-96dd0fbf4a78/20231012_M230_MoE_PVCre_SHIELD_delip_RIMS_RI_1500_3days_5x/'
+                  #'/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/20231031_M229_MoE_PVCre_P56_SHIELD_delp_RIMS_50perc_then_100perc_expanded_slightly_more_5x/',
+                  
+                  #'/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/20231115_M124_MoE_CasprtdT_Cuprizone_6wk__SHIELD_RIMS_RI1487_5x_60perc_laser_SUNFLOWER/',
+                
+                  #'/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/20231114_M147_MoE_FVB_7days_delip_RIMS_RI_1487_5days_5x_60perc_laser_SUNFLOWER/',
+                                
+                  #'/media/user/c0781205-1cf9-4ece-b3d5-96dd0fbf4a78/20231115_M139_MoE_CasprtdT_Cuprizone_6wk__SHIELD_RIMS_RI1487_5x_60perc_laser_SUNFLOWER/'
+                   
+                  #'/media/user/c0781205-1cf9-4ece-b3d5-96dd0fbf4a78/20231117_M222_96rik_Evans_Blue_SHIELD_RIMS_RI_1499_5x_80perc_laser_SUNFLOWER/',
+                    
+                  #'/media/user/c0781205-1cf9-4ece-b3d5-96dd0fbf4a78/20231117_M115_MoE_P56_5days_delip_RIMS_RI_1487_7days_5x_80perc_laser_REDO_WITH_SUNFLOWER/'
+                  
+                  '/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/20231116_M138_MoE_CasprtdT_Cup_CONTROL_6wk__SHIELD_RIMS_RI1487_5x_60perc_laser_SUNFLOWER/'
+                  
+                  
                   ]
     
 
@@ -192,14 +206,19 @@ if __name__=="__main__":
 
     """ Loop through all the folders and do the analysis!!!"""
     for input_path in list_folder:
-        foldername = input_path.split('/')[-2]
-        sav_dir = input_path + '/' + foldername + '_MaskRCNN_patches'
-    
 
         """ For testing ILASTIK images """
         images = glob.glob(os.path.join(input_path,'*.n5'))    # can switch this to "*truth.tif" if there is no name for "input"
         images.sort(key=natsort_keygen(alg=ns.REAL))  # natural sorting
         examples = [dict(input=i,truth=i.replace('.n5','.xml'), ilastik=i.replace('.tif','_single_Object Predictions_.tiff')) for i in images]
+
+
+        input_name = images[0]  
+        filename = input_name.split('/')[-1].split('.')[0:-1]
+        filename = '.'.join(filename)      
+        
+        sav_dir = input_path + '/' + filename + '_MaskRCNN_patches'
+    
          
         try:
             # Create target Directory
@@ -318,19 +337,21 @@ if __name__=="__main__":
                     
                 
                 ### for continuing the run
-                for id_c in range(232, len(all_xyzL)):
+                for id_c in range(0, len(all_xyzL)):
                     
-                    #id_c = 248
+                    #id_c = 100
                     
                     s_c = all_xyzL[id_c]
 
                     ### for debug:
                     #s_c = all_xyz[10]
                     tic = time.perf_counter()
+                     
+                    
                     
          
                     ### Load first tile normally, and then the rest as asynchronous processes
-                    if id_c == 232:
+                    if id_c == 0:
                         input_im, og_shape = get_im(dset, s_c, Lpatch_depth, Lpatch_size)
                         print('loaded normally')
                         
@@ -362,9 +383,13 @@ if __name__=="__main__":
                          
                          #time.sleep(10)
                          continue                
-                     
-                    
-                                        
+
+                    """ ### Run in a way that only re-does the missed ones """
+                    if os.path.isfile(sav_dir + filename + '_' + str(int(id_c)) + '_df.pkl'):
+                        continue
+  
+        
+  
                     print('Analyzing: ' + str(s_c))
                     print('Which is: ' + str(id_c) + ' of total: ' + str(len(all_xyzL)))
                     
@@ -699,7 +724,6 @@ if __name__=="__main__":
                     segmentation = np.asarray(segmentation, np.uint8)
                     tiff.imwrite(sav_dir + filename + '_' + str(int(id_c)) +'_segmentation_overlap3.tif', segmentation)                    
                     #post_process_async(cf, input_im, segmentation, input_name, sav_dir, all_patches, patch_size, patch_depth, id_c, focal_cube, s_c, debug)
-                    
                     
                     #zzz
                     ### Then call asynchronous post-processing to sort out boxes

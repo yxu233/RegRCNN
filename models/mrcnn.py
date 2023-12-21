@@ -671,7 +671,10 @@ class net(nn.Module):
         # extract features.
         fpn_outs = self.fpn(img)
         rpn_feature_maps = [fpn_outs[i] for i in self.cf.pyramid_levels]
-        self.mrcnn_feature_maps = rpn_feature_maps
+        #self.mrcnn_feature_maps = rpn_feature_maps  ### TIGER removed "self" so that torch tensors are not saved
+        #rpn_feature_maps
+        
+        
 
         # loop through pyramid layers and apply RPN.
         layer_outputs = [ self.rpn(p_feats) for p_feats in rpn_feature_maps ]
@@ -693,51 +696,56 @@ class net(nn.Module):
         
                     could we make this into just a simple forward pass???
         """
-        
-        batch_normed_props, batch_unnormed_props = mutils.refine_proposals(rpn_pred_probs, rpn_pred_deltas,
-                                                                            proposal_count, self.anchors, self.cf)
+        with torch.no_grad():  ### TIGER - moved this up
+            batch_normed_props, batch_unnormed_props = mutils.refine_proposals(rpn_pred_probs, rpn_pred_deltas,
+                                                                                proposal_count, self.anchors, self.cf)
+    
+            # merge batch dimension of proposals while storing allocation info in coordinate dimension.
+            batch_ixs = torch.arange(
+                batch_normed_props.shape[0]).cuda().unsqueeze(1).repeat(1,batch_normed_props.shape[1]).view(-1).float()
+            rpn_rois = batch_normed_props[:, :, :-1].view(-1, batch_normed_props[:, :, :-1].shape[2])
+            #self.rpn_rois_batch_info = torch.cat((rpn_rois, batch_ixs.unsqueeze(1)), dim=1)            
+            rpn_rois_batch_info = torch.cat((rpn_rois, batch_ixs.unsqueeze(1)), dim=1)   ### TIGER - removed "self" so wont save torch tensor
 
-        # merge batch dimension of proposals while storing allocation info in coordinate dimension.
-        batch_ixs = torch.arange(
-            batch_normed_props.shape[0]).cuda().unsqueeze(1).repeat(1,batch_normed_props.shape[1]).view(-1).float()
-        rpn_rois = batch_normed_props[:, :, :-1].view(-1, batch_normed_props[:, :, :-1].shape[2])
-        self.rpn_rois_batch_info = torch.cat((rpn_rois, batch_ixs.unsqueeze(1)), dim=1)
+    
+            # this is the first of two forward passes in the second stage, where no activations are stored for backprop.
+            # here, all proposals are forwarded (with virtual_batch_size = batch_size * post_nms_rois.)
+            # for inference/monitoring as well as sampling of rois for the loss functions.
+            # processed in chunks of roi_chunk_size to re-adjust to gpu-memory.
+            chunked_rpn_rois = rpn_rois_batch_info.split(self.cf.roi_chunk_size)
+            bboxes_list, class_logits_list, regressions_list = [], [], []
+            with torch.no_grad():
+                for chunk in chunked_rpn_rois:
+                    chunk_bboxes, chunk_class_logits, chunk_regressions = self.classifier(rpn_feature_maps, chunk)
+                    bboxes_list.append(chunk_bboxes)
+                    class_logits_list.append(chunk_class_logits)
+                    regressions_list.append(chunk_regressions)
+            mrcnn_bbox = torch.cat(bboxes_list, 0)
+            mrcnn_class_logits = torch.cat(class_logits_list, 0)
+            mrcnn_regressions = torch.cat(regressions_list, 0)
+            mrcnn_roi_scores = compute_roi_scores(self.cf.prediction_tasks, batch_normed_props, mrcnn_class_logits)  ### TIGER - removed "self" so wont save torch tensor
 
-        # this is the first of two forward passes in the second stage, where no activations are stored for backprop.
-        # here, all proposals are forwarded (with virtual_batch_size = batch_size * post_nms_rois.)
-        # for inference/monitoring as well as sampling of rois for the loss functions.
-        # processed in chunks of roi_chunk_size to re-adjust to gpu-memory.
-        chunked_rpn_rois = self.rpn_rois_batch_info.split(self.cf.roi_chunk_size)
-        bboxes_list, class_logits_list, regressions_list = [], [], []
-        with torch.no_grad():
-            for chunk in chunked_rpn_rois:
-                chunk_bboxes, chunk_class_logits, chunk_regressions = self.classifier(self.mrcnn_feature_maps, chunk)
-                bboxes_list.append(chunk_bboxes)
-                class_logits_list.append(chunk_class_logits)
-                regressions_list.append(chunk_regressions)
-        mrcnn_bbox = torch.cat(bboxes_list, 0)
-        mrcnn_class_logits = torch.cat(class_logits_list, 0)
-        mrcnn_regressions = torch.cat(regressions_list, 0)
-        self.mrcnn_roi_scores = compute_roi_scores(self.cf.prediction_tasks, batch_normed_props, mrcnn_class_logits)
+    
+            # refine classified proposals, filter and return final detections.
+            # returns (cf.max_inst_per_batch_element, n_coords+1+...)
+            detections = mutils.refine_detections(self.cf, batch_ixs, rpn_rois, mrcnn_bbox, mrcnn_roi_scores,
+                                           mrcnn_regressions)
+    
+            # forward remaining detections through mask-head to generate corresponding masks.
+            
+            
+            
+            scale = [img.shape[2]] * 4 + [img.shape[-1]] * 2
+            scale = torch.from_numpy(np.array(scale[:self.cf.dim * 2] + [1])[None]).float().cuda()
+    
+            # first self.cf.dim * 2 entries on axis 1 are always the box coords, +1 is batch_ix
+            detection_boxes = detections[:, :self.cf.dim * 2 + 1] / scale
+            detection_masks = self.mask(rpn_feature_maps, detection_boxes)
 
-        # refine classified proposals, filter and return final detections.
-        # returns (cf.max_inst_per_batch_element, n_coords+1+...)
-        detections = mutils.refine_detections(self.cf, batch_ixs, rpn_rois, mrcnn_bbox, self.mrcnn_roi_scores,
-                                       mrcnn_regressions)
-
-        # forward remaining detections through mask-head to generate corresponding masks.
-        scale = [img.shape[2]] * 4 + [img.shape[-1]] * 2
-        scale = torch.from_numpy(np.array(scale[:self.cf.dim * 2] + [1])[None]).float().cuda()
-
-        # first self.cf.dim * 2 entries on axis 1 are always the box coords, +1 is batch_ix
-        detection_boxes = detections[:, :self.cf.dim * 2 + 1] / scale
-        with torch.no_grad():
-            detection_masks = self.mask(self.mrcnn_feature_maps, detection_boxes)
-
-        return [rpn_pred_logits, rpn_pred_deltas, batch_unnormed_props, detections, detection_masks]
+        return [rpn_pred_logits, rpn_pred_deltas, batch_unnormed_props, detections, detection_masks, rpn_feature_maps, rpn_rois_batch_info, mrcnn_roi_scores]
 
 
-    def loss_samples_forward(self, batch_gt_boxes, batch_gt_masks, batch_gt_class_ids, batch_gt_regressions=None):
+    def loss_samples_forward(self, batch_gt_boxes, batch_gt_masks, batch_gt_class_ids, batch_gt_regressions=None, rpn_feature_maps=None, rpn_rois_batch_info=None, mrcnn_roi_scores=None):
         """
         this is the second forward pass through the second stage (features from stage one are re-used).
         samples few rois in loss_example_mining and forwards only those for loss computation.
@@ -754,14 +762,15 @@ class net(nn.Module):
         :return: sample_proposals: (n_sampled_rois, 2 * dim) RPN output for sampled proposals. only for monitoring/plotting.
         """
         # sample rois for loss and get corresponding targets for all Mask R-CNN head network losses.
-        sample_ics, sample_target_deltas, sample_target_mask, sample_target_class_ids, sample_target_regressions = \
-            mutils.loss_example_mining(self.cf, self.rpn_rois_batch_info, batch_gt_boxes, batch_gt_masks,
-                                       self.mrcnn_roi_scores, batch_gt_class_ids, batch_gt_regressions)
-
-        # re-use feature maps and RPN output from first forward pass.
-        sample_proposals = self.rpn_rois_batch_info[sample_ics]
-        
-        
+        with torch.no_grad():
+            sample_ics, sample_target_deltas, sample_target_mask, sample_target_class_ids, sample_target_regressions = \
+                mutils.loss_example_mining(self.cf, rpn_rois_batch_info, batch_gt_boxes, batch_gt_masks,
+                                           mrcnn_roi_scores, batch_gt_class_ids, batch_gt_regressions)
+    
+            # re-use feature maps and RPN output from first forward pass.
+            sample_proposals = rpn_rois_batch_info[sample_ics]
+            
+            
         """ TIGER - remove SHEM sampling from above """
         # re-use feature maps and RPN output from first forward pass.
         #sample_proposals = self.rpn_rois_batch_info       
@@ -776,8 +785,8 @@ class net(nn.Module):
         
         
         if not 0 in sample_proposals.size():
-            sample_deltas, sample_logits, sample_regressions = self.classifier(self.mrcnn_feature_maps, sample_proposals)
-            sample_mask = self.mask(self.mrcnn_feature_maps, sample_proposals)
+            sample_deltas, sample_logits, sample_regressions = self.classifier(rpn_feature_maps, sample_proposals)
+            sample_mask = self.mask(rpn_feature_maps, sample_proposals)
         else:
             sample_logits = torch.FloatTensor().cuda()
             sample_deltas = torch.FloatTensor().cuda()
@@ -877,7 +886,20 @@ class net(nn.Module):
                         # color[full_mask > 0.49999] = i
                         # color[full_mask <= 0.49999] = 0
                         
-                        mask_coords.append(np.transpose(np.where(full_mask > 0.49999)))
+                        #mask_coords.append(np.transpose(np.where(full_mask > 0.49999)))
+                        
+                        
+                        
+                        ### WHEN TRAINING SET THIS BLANK TO NOT TAKE UP EXTRA GPU RAM
+                        mask_coords.append([])
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
                         
                         #colored_masks[class_ids[i]] = np.max((colored_masks[class_ids[i]], color), axis=0)
                        
@@ -958,11 +980,17 @@ class net(nn.Module):
 
         #forward passes. 1. general forward pass, where no activations are saved in second stage (for performance
         # monitoring and loss sampling). 2. second stage forward pass of sampled rois with stored activations for backprop.
-        rpn_class_logits, rpn_pred_deltas, proposal_boxes, detections, detection_masks = self.forward(img)
+        rpn_class_logits, rpn_pred_deltas, proposal_boxes, detections, detection_masks, rpn_feature_maps, rpn_rois_batch_info, mrcnn_roi_scores = self.forward(img)     
+       
+        
+        ### TIGER - added to prevent memory leak... anything else to detach?
+        img = img.detach().cpu().numpy()
+        
+        #with torch.no_grad():        
 
         mrcnn_pred_deltas, mrcnn_pred_mask, mrcnn_class_logits, mrcnn_regressions, sample_proposals, \
         mrcnn_target_deltas, target_mask, target_class_ids, target_regressions = \
-            self.loss_samples_forward(gt_boxes, gt_masks, gt_class_ids, gt_regressions)
+            self.loss_samples_forward(gt_boxes, gt_masks, gt_class_ids, gt_regressions, rpn_feature_maps, rpn_rois_batch_info, mrcnn_roi_scores)
         # loop over batch
         for b in range(img.shape[0]):
             if len(gt_boxes[b]) > 0:
@@ -993,6 +1021,8 @@ class net(nn.Module):
             rpn_bbox_loss = compute_rpn_bbox_loss(rpn_pred_deltas[b], rpn_target_deltas, rpn_match_gpu)
             batch_rpn_class_loss += rpn_class_loss /img.shape[0]
             batch_rpn_bbox_loss += rpn_bbox_loss /img.shape[0]
+            
+            #print(batch_rpn_bbox_loss)
 
             # add negative anchors used for loss to output list for monitoring.
             # neg_anchor_ix = neg_ix come from shem and mark positions in roi_probs_neg = rpn_class_logits[neg_indices]
@@ -1016,6 +1046,8 @@ class net(nn.Module):
         #         box_results_list[int(r[-1])].append({'box_coords': r[:-1] * self.cf.scale,
         #                                     'box_type': 'pos_class' if target_class_ids[ix] > 0 else 'neg_class'})
 
+         
+
         # compute mrcnn losses.
         mrcnn_class_loss = compute_mrcnn_class_loss(self.cf.prediction_tasks, mrcnn_class_logits, target_class_ids)
         mrcnn_bbox_loss = compute_mrcnn_bbox_loss(mrcnn_pred_deltas, mrcnn_target_deltas, target_class_ids)
@@ -1031,9 +1063,21 @@ class net(nn.Module):
               mrcnn_bbox_loss + mrcnn_mask_loss +  mrcnn_class_loss + mrcnn_regressions_loss
 
 
+        #batch_rpn_class_loss = batch_rpn_class_loss.detach().cpu().numpy()
+        #batch_rpn_bbox_loss = batch_rpn_bbox_loss.detach().cpu().numpy()
+        #mrcnn_bbox_loss = mrcnn_bbox_loss.detach().cpu().numpy()
+        #mrcnn_mask_loss = mrcnn_mask_loss.detach().cpu().numpy()
+        #mrcnn_class_loss = mrcnn_class_loss.detach().cpu().numpy()
+        #mrcnn_regressions_loss = mrcnn_regressions_loss.detach().cpu().numpy()
+        
+        #del batch_rpn_class_loss
+        #del batch_rpn_bbox_loss
+        #del mrcnn_mask_loss
+        #del mrcnn_class_loss
+        #del mrcnn_regressions_loss
+
         ### TIGER - removed class losses
-        # loss = batch_rpn_bbox_loss +\
-        #        mrcnn_bbox_loss + mrcnn_mask_loss + mrcnn_regressions_loss
+        #loss =   mrcnn_bbox_loss + mrcnn_mask_loss + mrcnn_regressions_loss
 
 
 
@@ -1048,7 +1092,7 @@ class net(nn.Module):
 
         if 'dice' in self.cf.metrics:
             results_dict['batch_dices'] = mutils.dice_per_batch_and_class(
-                results_dict['seg_preds'], batch["seg"], self.cf.num_seg_classes, convert_to_ohe=True)
+                results_dict['seg_preds'], batch["seg"], self.cf.num_seg_classes, convert_to_ohe=True) 
 
         results_dict['torch_loss'] = loss
         results_dict['class_loss'] = mrcnn_class_loss.item()

@@ -39,6 +39,11 @@ class Configs(DefaultConfigs):
         self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data', "")
         
         
+        # for new computer
+        self.pp_rootdir = os.path.join('/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/Training_blocks_RegRCNN/OL_data', "")
+               
+        
+        
         #self.pp_rootdir = os.path.join('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/OL_data', "")
         self.pp_npz_dir = self.pp_rootdir+"_npz"
 
@@ -103,9 +108,14 @@ class Configs(DefaultConfigs):
 
         self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger'
 
+
         #self.data_sourcedir = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/OL_data/Tiger'
 
-
+        
+        # for new computer
+        self.data_sourcedir = os.path.join('/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/Training_blocks_RegRCNN/OL_data/Tiger', "")
+               
+        
 
         """ Try:
                 - normalization?
@@ -371,7 +381,7 @@ class Configs(DefaultConfigs):
         #     self.num_val_batches = 35 if self.dim==2 else 25
 
         ### TIGER - changed to validating ALL samples
-        self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
+        self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
         if self.val_mode == 'val_patient':
             self.max_val_patients = 'all'  # if 'all' iterates over entire val_set once.
         if self.val_mode == 'val_sampling':
@@ -812,7 +822,7 @@ class Configs(DefaultConfigs):
       ### TIGER EDITS  
       # self.pool_size = (7, 7) if self.dim == 2 else (7, 7, 5)
       # self.mask_pool_size = (14, 14) if self.dim == 2 else (14, 14, 8)
-      self.mask_shape = (28, 28) if self.dim == 2 else (56, 56, 20)
+      #self.mask_shape = (28, 28) if self.dim == 2 else (56, 56, 20)
 
 
 

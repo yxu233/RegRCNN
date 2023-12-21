@@ -77,8 +77,14 @@ import numpy as np
 
 
 
-a = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/41.npy')
-b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/41_seg.npy')
+# a = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/41.npy')
+# b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/41_seg.npy')
+
+
+
+a = np.load('/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/Training_blocks_RegRCNN/OL_data/Tiger/train/1905.npy')
+b = np.load('/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/Training_blocks_RegRCNN/OL_data/Tiger/train/1905_seg.npy')
+
 
 
 # import napari
@@ -87,11 +93,12 @@ b = np.load('/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Train
 
 import _pickle as cPickle
 
-with open(r"/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/info_df.pickle", "rb") as input_file:
-     e = cPickle.load(input_file)
+# with open(r"/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/OL_data/Tiger/train/info_df.pickle", "rb") as input_file:
+#      e = cPickle.load(input_file)
      
 
-
+with open(r"/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/Training_blocks_RegRCNN/OL_data/Tiger/train/info_df.pickle", "rb") as input_file:
+     e = cPickle.load(input_file)
 
 
 zzz

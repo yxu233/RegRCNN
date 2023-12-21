@@ -389,8 +389,12 @@ class BatchGenerator(SlimDataLoaderBase):
 
 
         ### TIGER - this gets statistics of the data, so that it can be balanced
+        # self.targ_stats = self.sample_stats.agg(
+        #     ("sum", lambda col: col.sum() / len(self._data)), axis=0, sort=False).rename({"<lambda>": "relative"})
+
+        ### REMOVED "SORT=FALSE" from above after pandas upgrade
         self.targ_stats = self.sample_stats.agg(
-            ("sum", lambda col: col.sum() / len(self._data)), axis=0, sort=False).rename({"<lambda>": "relative"})
+            ("sum", lambda col: col.sum() / len(self._data)), axis=0).rename({"<lambda>": "relative"})
 
         anchor = 1. - self.targ_stats.loc["relative"].iloc[0]
         self.fg_bg_weights = anchor / self.targ_stats.loc["relative"]
@@ -689,11 +693,14 @@ def convert_seg_to_bounding_box_coordinates(data_dict, dim, roi_item_keys, get_r
     if get_rois_from_seg:
         data_dict.pop('class_targets', None)
 
-    data_dict['bb_target'] = np.array(bb_target)
-    data_dict['roi_masks'] = np.array(roi_masks)
+    #print(len(bb_target))
+    #print(bb_target[0].shape)
+
+    data_dict['bb_target'] = bb_target  ### TIGER - removed np.array() after upgrading pandas and numpy since you can no longer force to be an array of differing sizes
+    data_dict['roi_masks'] = roi_masks  ### TIGER - removed np.array() after upgrading pandas and numpy since you can no longer force to be an array of differing sizes
     data_dict['seg'] = out_seg
     for name in roi_item_keys:
-        data_dict[name] = np.array(roi_items[name])
+        data_dict[name] = roi_items[name]  ### TIGER - removed np.array() after upgrading pandas and numpy since you can no longer force to be an array of differing sizes
 
 
     return data_dict

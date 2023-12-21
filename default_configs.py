@@ -103,8 +103,7 @@ class DefaultConfigs:
         self.seed = 0
 
         #number of threads for multithreaded tasks like batch generation, wcs, merge2dto3d
-        self.n_workers = 16 if server_env else os.cpu_count()
-        #self.n_workers = 1 if server_env else os.cpu_count()
+        self.n_workers = 16 if server_env else 8
 
         self.create_bounding_box_targets = True
         self.class_specific_seg = True  # False if self.model=="mrcnn" else True

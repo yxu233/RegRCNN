@@ -34,6 +34,9 @@ torch.cuda.set_device(1)
 torch.manual_seed(0)   ### for randomly selecting negative samples instead of SHEM
 
 
+torch.backends.cudnn.enabled = True
+torch.backends.cudnn.benchmark = True
+
 
 import utils.exp_utils as utils
 from evaluator import Evaluator
@@ -47,17 +50,17 @@ for msg in ["Attempting to set identical bottom==top results",
     warnings.filterwarnings("ignore", msg)
 
 
-def train(cf, logger):
+def train(cf, log):
     """
     performs the training routine for a given fold. saves plots and selected parameters to the experiment dir
     specified in the configs. logs to file and tensorboard.
     """
-    logger.info('performing training in {}D over fold {} on experiment {} with model {}'.format(
+    log.info('performing training in {}D over fold {} on experiment {} with model {}'.format(
         cf.dim, cf.fold, cf.exp_dir, cf.model))
-    logger.time("train_val")
+    log.time("train_val")
 
     # -------------- inits and settings -----------------
-    net = model.net(cf, logger).cuda()
+    net = model.net(cf, log).cuda()
     
     
     # device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
@@ -82,34 +85,37 @@ def train(cf, logger):
     if cf.dynamic_lr_scheduling:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=cf.scheduling_mode, factor=cf.lr_decay_factor,
                                                                patience=cf.scheduling_patience)
-    model_selector = utils.ModelSelector(cf, logger)
+    model_selector = utils.ModelSelector(cf, log)
 
     starting_epoch = 1
     if cf.resume:
         checkpoint_path = os.path.join(cf.fold_dir, "last_state.pth")
         starting_epoch, net, optimizer, model_selector = \
             utils.load_checkpoint(checkpoint_path, net, optimizer, model_selector)
-        logger.info('resumed from checkpoint {} to epoch {}'.format(checkpoint_path, starting_epoch))
+        log.info('resumed from checkpoint {} to epoch {}'.format(checkpoint_path, starting_epoch))
 
     # prepare monitoring
     monitor_metrics = utils.prepare_monitoring(cf)
 
-    logger.info('loading dataset and initializing batch generators...')
-    batch_gen = data_loader.get_train_generators(cf, logger)
+    log.info('loading dataset and initializing batch generators...')
+    batch_gen = data_loader.get_train_generators(cf, log)
 
     # -------------- training -----------------
     for epoch in range(starting_epoch, cf.num_epochs + 1):
 
-        logger.info('starting training epoch {}/{}'.format(epoch, cf.num_epochs))
-        logger.time("train_epoch")
+        #torch.cuda.empty_cache()        
+
+        log.info('starting training epoch {}/{}'.format(epoch, cf.num_epochs))
+        log.time("train_epoch")
 
         net.train()
 
         train_results_list = []
-        train_evaluator = Evaluator(cf, logger, mode='train')
+        train_evaluator = Evaluator(cf, log, mode='train')
+
 
         for i in range(cf.num_train_batches):
-            logger.time("train_batch_loadfw")
+            #log.time("train_batch_loadfw")
             batch = next(batch_gen['train'])
             
             
@@ -125,175 +131,199 @@ def train(cf, logger):
             batch_gen['train'].generator.stats['roi_counts'] += batch['roi_counts']
             batch_gen['train'].generator.stats['empty_counts'] += batch['empty_counts']
 
-            logger.time("train_batch_loadfw")
-            logger.time("train_batch_netfw")
+            #log.time("train_batch_loadfw")
+            #log.time("train_batch_netfw")
+            #with torch.no_grad():
             results_dict = net.train_forward(batch)
-            logger.time("train_batch_netfw")
-            logger.time("train_batch_bw")
+            #log.time("train_batch_netfw")
+            #log.time("train_batch_bw")
             optimizer.zero_grad()
             
-            #print(results_dict['torch_loss'])
+            # #print(results_dict['torch_loss'])
             
             results_dict['torch_loss'].backward()
             
-            # if i == 88:  ### this is an empty batch (46 is single empty)
-            #     continue
+            # # if i == 88:  ### this is an empty batch (46 is single empty)
+            # #     continue
             
-            ## SAVE BATCH DATA IF LOSS == 0!!!
-            # import numpy as np
-            # import tifffile as tiff
-            # out_file = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/output_batch/'
-            # loss_int = results_dict['torch_loss'].item() 
-            # if loss_int > 1:
+            # ## SAVE BATCH DATA IF LOSS == 0!!!
+            # # import numpy as np
+            # # import tifffile as tiff
+            # # out_file = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/output_batch/'
+            # # loss_int = results_dict['torch_loss'].item() 
+            # # if loss_int > 1:
                 
-            #     print('___________________________________________________________________________________________________')
-            #     input_im = np.moveaxis(batch['data'], -1, 1) 
-            #     truth_im = np.moveaxis(batch['seg'], -1, 1) 
-            #     seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
+            # #     print('___________________________________________________________________________________________________')
+            # #     input_im = np.moveaxis(batch['data'], -1, 1) 
+            # #     truth_im = np.moveaxis(batch['seg'], -1, 1) 
+            # #     seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
                 
-            #     for id_z in range(cf.batch_size):
+            # #     for id_z in range(cf.batch_size):
                     
-            #         inp = np.expand_dims(input_im[id_z], 0)
-            #         truth = np.expand_dims(truth_im[id_z], 0)
-            #         seg = np.expand_dims(seg_im[id_z], 0)
+            # #         inp = np.expand_dims(input_im[id_z], 0)
+            # #         truth = np.expand_dims(truth_im[id_z], 0)
+            # #         seg = np.expand_dims(seg_im[id_z], 0)
                     
     
-            #         ### plot concatenated TIFF
-            #         truth[truth > 0] = 65535
-            #         seg[seg > 0] = 65535
-            #         concat  = np.concatenate((inp, np.asarray(truth, dtype=np.uint16), np.asarray(seg, dtype=np.uint16)))
+            # #         ### plot concatenated TIFF
+            # #         truth[truth > 0] = 65535
+            # #         seg[seg > 0] = 65535
+            # #         concat  = np.concatenate((inp, np.asarray(truth, dtype=np.uint16), np.asarray(seg, dtype=np.uint16)))
     
-            #         concat = np.moveaxis(concat, 0, 2)       
-            #         concat = np.moveaxis(concat, 0, 1)                         
-    
-    
-            #         tiff.imwrite(out_file + 'epoch_' + str(epoch) + '_iter_' + str(i) + '_batch_' +  str(id_z) + '_loss_' + str(round(loss_int, 2)) + '_COMPOSITE.tif', concat,
-            #                       imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+            # #         concat = np.moveaxis(concat, 0, 2)       
+            # #         concat = np.moveaxis(concat, 0, 1)                         
     
     
-            #         max_im = np.amax(inp, axis=1)[0][0]
-            #         max_im[max_im > 2000] = 2000
-            #         max_im = np.asarray((max_im/2000) * 255, dtype=np.uint8)
+            # #         tiff.imwrite(out_file + 'epoch_' + str(epoch) + '_iter_' + str(i) + '_batch_' +  str(id_z) + '_loss_' + str(round(loss_int, 2)) + '_COMPOSITE.tif', concat,
+            # #                       imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
     
-            #         tiff.imwrite(out_file + 'MAX_epoch_' + str(epoch) + '_iter_' + str(i) + '_batch_' +  str(id_z) + '_loss_' + str(round(loss_int, 2))+ '_COMPOSITE.tif', max_im)
+    
+            # #         max_im = np.amax(inp, axis=1)[0][0]
+            # #         max_im[max_im > 2000] = 2000
+            # #         max_im = np.asarray((max_im/2000) * 255, dtype=np.uint8)
+    
+            # #         tiff.imwrite(out_file + 'MAX_epoch_' + str(epoch) + '_iter_' + str(i) + '_batch_' +  str(id_z) + '_loss_' + str(round(loss_int, 2))+ '_COMPOSITE.tif', max_im)
     
 
-                
-  
+            results_dict['torch_loss'] = results_dict['torch_loss'].detach().cpu().numpy()
+            #del results_dict['torch_loss']
+            # for k,v in results_dict.items():
+            #     del v
+            #del results_dict
+            #del batch
+
             
             if cf.clip_norm:
                 torch.nn.utils.clip_grad_norm_(net.parameters(), cf.clip_norm, norm_type=2) # gradient clipping
             optimizer.step()
-            train_results_list.append(({k:v for k,v in results_dict.items() if k != "seg_preds"}, batch["pid"])) # slim res dict
-            if not cf.server_env:
-                print("\rFinished training batch " +
-                      "{}/{} in {:.1f}s ({:.2f}/{:.2f} forw load/net, {:.2f} backw).".format(i+1, cf.num_train_batches,
-                                                                                              logger.get_time("train_batch_loadfw")+
-                                                                                              logger.get_time("train_batch_netfw")
-                                                                                              +logger.time("train_batch_bw"),
-                                                                                              logger.get_time("train_batch_loadfw",reset=True),
-                                                                                              logger.get_time("train_batch_netfw", reset=True),
-                                                                                              logger.get_time("train_batch_bw", reset=True)), end="", flush=True)
-        print()
 
-        #--------------- train eval ----------------
-        if (epoch-1)%cf.plot_frequency==0:
-            # view an example batch
-            utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,
-                                    show_gt_labels=True, get_time="train-example plot",
-                                    out_file=os.path.join(cf.plot_dir, 'batch_example_train_{}.png'.format(cf.fold)))
+            
+
+            #train_results_list.append(({k:v for k,v in results_dict.items() if k != "seg_preds"}, batch["pid"])) # slim res dict
+            # if not cf.server_env:
+            #     print("\rFinished training batch " +
+            #           "{}/{} in {:.1f}s ({:.2f}/{:.2f} forw load/net, {:.2f} backw).".format(i+1, cf.num_train_batches,
+            #                                                                                   log.get_time("train_batch_loadfw")+
+            #                                                                                   log.get_time("train_batch_netfw")
+            #                                                                                   +log.time("train_batch_bw"),
+            #                                                                                   log.get_time("train_batch_loadfw",reset=True),
+            #                                                                                   log.get_timwe("train_batch_netfw", reset=True),
+            #                                                                                   log.get_time("train_batch_bw", reset=True)), end="", flush=True)
 
 
-        logger.time("evals")
-        _, monitor_metrics['train'] = train_evaluator.evaluate_predictions(train_results_list, monitor_metrics['train'])
-        logger.time("evals")
-        logger.time("train_epoch", toggle=False)
-        del train_results_list
+            
 
-        #----------- validation ------------
-        logger.info('starting validation in mode {}.'.format(cf.val_mode))
-        logger.time("val_epoch")
-        with torch.no_grad():
-            net.eval()
-            val_results_list = []
-            val_evaluator = Evaluator(cf, logger, mode=cf.val_mode)
-            val_predictor = Predictor(cf, net, logger, mode='val')
+            import gc
+            print(len(gc.get_objects()))
+            # for obj in gc.get_objects():
+            #     try:
+            #         if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+            #             print(type(obj), obj.size())
+            #     except:
+            #         pass
+                
+                
 
-            for i in range(batch_gen['n_val']):
-                logger.time("val_batch")
-                batch = next(batch_gen[cf.val_mode])
-                if cf.val_mode == 'val_patient':
-                    results_dict = val_predictor.predict_patient(batch)
-                elif cf.val_mode == 'val_sampling':
-                    results_dict = net.train_forward(batch, is_validation=True)
-                val_results_list.append([results_dict, batch["pid"]])
-                if not cf.server_env:
-                    print("\rFinished validation {} {}/{} in {:.1f}s.".format('patient' if cf.val_mode=='val_patient' else 'batch',
-                                                                              i + 1, batch_gen['n_val'],
-                                                                              logger.time("val_batch")), end="", flush=True)
-            print()
+        # print()
+
+        # #--------------- train eval ----------------
+        # if (epoch-1)%cf.plot_frequency==0:
+        #     # view an example batch
+        #     utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,
+        #                             show_gt_labels=True, get_time="train-example plot",
+        #                             out_file=os.path.join(cf.plot_dir, 'batch_example_train_{}.png'.format(cf.fold)))
 
 
+        # log.time("evals")
+        # _, monitor_metrics['train'] = train_evaluator.evaluate_predictions(train_results_list, monitor_metrics['train'])
+        # log.time("evals")
+        # log.time("train_epoch", toggle=False)
+        # del train_results_list
 
-            #------------ val eval -------------
-            if (epoch - 1) % cf.plot_frequency == 0:
-                utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,
-                                        show_gt_labels=True, get_time="val-example plot",
-                                        out_file=os.path.join(cf.plot_dir, 'batch_example_val_{}.png'.format(cf.fold)))
+        # #----------- validation ------------
+        # log.info('starting validation in mode {}.'.format(cf.val_mode))
+        # log.time("val_epoch")
+        # with torch.no_grad():
+        #     net.eval()
+        #     val_results_list = []
+        #     val_evaluator = Evaluator(cf, log, mode=cf.val_mode)
+        #     val_predictor = Predictor(cf, net, log, mode='val')
 
-            logger.time("evals")
-            _, monitor_metrics['val'] = val_evaluator.evaluate_predictions(val_results_list, monitor_metrics['val'])
+        #     for i in range(batch_gen['n_val']):
+        #         log.time("val_batch")
+        #         batch = next(batch_gen[cf.val_mode])
+        #         if cf.val_mode == 'val_patient':
+        #             results_dict = val_predictor.predict_patient(batch)
+        #         elif cf.val_mode == 'val_sampling':
+        #             results_dict = net.train_forward(batch, is_validation=True)
+        #         val_results_list.append([results_dict, batch["pid"]])
+        #         if not cf.server_env:
+        #             print("\rFinished validation {} {}/{} in {:.1f}s.".format('patient' if cf.val_mode=='val_patient' else 'batch',
+        #                                                                       i + 1, batch_gen['n_val'],
+        #                                                                       log.time("val_batch")), end="", flush=True)
+        #     print()
 
-            model_selector.run_model_selection(net, optimizer, monitor_metrics, epoch)
-            del val_results_list
-            #----------- monitoring -------------
-            monitor_metrics.update({"lr": 
-                {str(g) : group['lr'] for (g, group) in enumerate(optimizer.param_groups)}})
-            logger.metrics2tboard(monitor_metrics, global_step=epoch)
-            logger.time("evals")
+
+
+        #     #------------ val eval -------------
+        #     if (epoch - 1) % cf.plot_frequency == 0:
+        #         utils.split_off_process(plg.view_batch, cf, batch, results_dict, has_colorchannels=cf.has_colorchannels,
+        #                                 show_gt_labels=True, get_time="val-example plot",
+        #                                 out_file=os.path.join(cf.plot_dir, 'batch_example_val_{}.png'.format(cf.fold)))
+
+        #     log.time("evals")
+        #     _, monitor_metrics['val'] = val_evaluator.evaluate_predictions(val_results_list, monitor_metrics['val'])
+
+        #     model_selector.run_model_selection(net, optimizer, monitor_metrics, epoch)
+        #     del val_results_list
+        #     #----------- monitoring -------------
+        #     monitor_metrics.update({"lr": 
+        #         {str(g) : group['lr'] for (g, group) in enumerate(optimizer.param_groups)}})
+        #     log.metrics2tboard(monitor_metrics, global_step=epoch)
+        #     log.time("evals")
             
 
 
 
 
-            #----------- Plot same image each time -------------
-            # import numpy as np
-            # import tifffile as tiff
-            # out_file = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/output_batch/'
-            # #loss_int = results_dict['torch_loss'].item() 
+        #     #----------- Plot same image each time -------------
+        #     # import numpy as np
+        #     # import tifffile as tiff
+        #     # out_file = '/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/output_batch/'
+        #     # #loss_int = results_dict['torch_loss'].item() 
             
-            # batch_gen_test = data_loader.get_test_generator(cf, logger)
+        #     # batch_gen_test = data_loader.get_test_generator(cf, log)
             
-            # pids = batch_gen_test["test"].dataset_pids
+        #     # pids = batch_gen_test["test"].dataset_pids
             
-            # batch = batch_gen_test['test'].generate_train_batch(pid=pids[0])
-            # results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
+        #     # batch = batch_gen_test['test'].generate_train_batch(pid=pids[0])
+        #     # results_dict = net.test_forward(batch) #seg preds are only seg_logits! need to take argmax.
 
-            # if 'seg_preds' in results_dict.keys():
-            #     results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
+        #     # if 'seg_preds' in results_dict.keys():
+        #     #     results_dict['seg_preds'] = np.argmax(results_dict['seg_preds'], axis=1)[:,np.newaxis]
     
 
-            # input_im = np.moveaxis(batch['data'], -1, 1) 
-            # truth_im = np.moveaxis(batch['seg'], -1, 1) 
-            # seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
+        #     # input_im = np.moveaxis(batch['data'], -1, 1) 
+        #     # truth_im = np.moveaxis(batch['seg'], -1, 1) 
+        #     # seg_im = np.moveaxis(results_dict['seg_preds'], -1, 1) 
             
      
-            # inp = np.expand_dims(input_im[0], 0)
-            # truth = np.expand_dims(truth_im[0], 0)
-            # seg = np.expand_dims(seg_im[0], 0)
+        #     # inp = np.expand_dims(input_im[0], 0)
+        #     # truth = np.expand_dims(truth_im[0], 0)
+        #     # seg = np.expand_dims(seg_im[0], 0)
             
 
-            # ### plot concatenated TIFF
-            # truth[truth > 0] = 65535
-            # seg[seg > 0] = 65535
-            # concat  = np.concatenate((inp, np.asarray(truth, dtype=np.uint16), np.asarray(seg, dtype=np.uint16)))
+        #     # ### plot concatenated TIFF
+        #     # truth[truth > 0] = 65535
+        #     # seg[seg > 0] = 65535
+        #     # concat  = np.concatenate((inp, np.asarray(truth, dtype=np.uint16), np.asarray(seg, dtype=np.uint16)))
 
-            # concat = np.moveaxis(concat, 0, 2)       
-            # concat = np.moveaxis(concat, 0, 1)                         
+        #     # concat = np.moveaxis(concat, 0, 2)       
+        #     # concat = np.moveaxis(concat, 0, 1)                         
 
 
-            # tiff.imwrite(out_file + 'VAL_IM_epoch_' + str(epoch) + '_batch_' +  str(0)  + '_COMPOSITE.tif', concat,
-            #               imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
+        #     # tiff.imwrite(out_file + 'VAL_IM_epoch_' + str(epoch) + '_batch_' +  str(0)  + '_COMPOSITE.tif', concat,
+        #     #               imagej=True,   metadata={'spacing': 1, 'unit': 'um', 'axes': 'TZCYX'})
          
             
             
@@ -302,11 +332,11 @@ def train(cf, logger):
             
             
 
-            logger.info('finished epoch {}/{}, took {:.2f}s. train total: {:.2f}s, average: {:.2f}s. val total: {:.2f}s, average: {:.2f}s.'.format(
-                epoch, cf.num_epochs, logger.get_time("train_epoch")+logger.time("val_epoch"), logger.get_time("train_epoch"),
-                logger.get_time("train_epoch", reset=True)/cf.num_train_batches, logger.get_time("val_epoch"),
-                logger.get_time("val_epoch", reset=True)/batch_gen["n_val"]))
-            logger.info("time for evals: {:.2f}s".format(logger.get_time("evals", reset=True)))
+            # log.info('finished epoch {}/{}, took {:.2f}s. train total: {:.2f}s, average: {:.2f}s. val total: {:.2f}s, average: {:.2f}s.'.format(
+            #     epoch, cf.num_epochs, log.get_time("train_epoch")+log.time("val_epoch"), log.get_time("train_epoch"),
+            #     log.get_time("train_epoch", reset=True)/cf.num_train_batches, log.get_time("val_epoch"),
+            #     log.get_time("val_epoch", reset=True)/batch_gen["n_val"]))
+            # log.info("time for evals: {:.2f}s".format(log.get_time("evals", reset=True)))
 
         #-------------- scheduling -----------------
         if cf.dynamic_lr_scheduling:
@@ -315,28 +345,28 @@ def train(cf, logger):
             for param_group in optimizer.param_groups:
                 param_group['lr'] = cf.learning_rate[epoch-1]
 
-    logger.time("train_val")
-    logger.info("Training and validating over {} epochs took {}".format(cf.num_epochs, logger.get_time("train_val", format="hms", reset=True)))
-    batch_gen['train'].generator.print_stats(logger, plot=True)
+    log.time("train_val")
+    log.info("Training and validating over {} epochs took {}".format(cf.num_epochs, log.get_time("train_val", format="hms", reset=True)))
+    batch_gen['train'].generator.print_stats(log, plot=True)
 
-def test(cf, logger, max_fold=None):
+def test(cf, log, max_fold=None):
     """performs testing for a given fold (or held out set). saves stats in evaluator.
     """
-    logger.time("test_fold")
-    logger.info('starting testing model of fold {} in exp {}'.format(cf.fold, cf.exp_dir))
-    net = model.net(cf, logger).cuda()
-    batch_gen = data_loader.get_test_generator(cf, logger)
+    log.time("test_fold")
+    log.info('starting testing model of fold {} in exp {}'.format(cf.fold, cf.exp_dir))
+    net = model.net(cf, log).cuda()
+    batch_gen = data_loader.get_test_generator(cf, log)
 
-    test_predictor = Predictor(cf, net, logger, mode='test')
+    test_predictor = Predictor(cf, net, log, mode='test')
     test_results_list = test_predictor.predict_test_set(batch_gen, return_results = not hasattr(
         cf, "eval_test_separately") or not cf.eval_test_separately)
 
     if test_results_list is not None:
-        test_evaluator = Evaluator(cf, logger, mode='test')
+        test_evaluator = Evaluator(cf, log, mode='test')
         test_evaluator.evaluate_predictions(test_results_list)
         test_evaluator.score_test_df(max_fold=max_fold)
 
-    logger.info('Testing of fold {} took {}.\n'.format(cf.fold, logger.get_time("test_fold", reset=True, format="hms")))
+    log.info('Testing of fold {} took {}.\n'.format(cf.fold, log.get_time("test_fold", reset=True, format="hms")))
 
 if __name__ == '__main__':
     stime = time.time()
@@ -351,12 +381,14 @@ if __name__ == '__main__':
     ### FOR OLIGO TRAINING    
     parser.add_argument('--dataset_name', type=str, default='OL_data',
                         help="path to the dataset-specific code in source_dir/datasets")
-    parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/',
-                         help='path to experiment dir. will be created if non existent.')
+    # parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN/',
+    #                      help='path to experiment dir. will be created if non existent.')
     
     #parser.add_argument('--exp_dir', type=str, default='/media/user/FantomHD/Lightsheet data/Training_data_lightsheet/Training_blocks/Training_blocks_RegRCNN_device0/',
     #                    help='path to experiment dir. will be created if non existent.')
     
+    parser.add_argument('--exp_dir', type=str, default='/media/user/ce86e0dd-459a-4cf1-8194-d1c89b7ef7f6/Training_blocks_RegRCNN/',
+                         help='path to experiment dir. will be created if non existent.')
         
     
     ### FOR CASPR TRAINING
@@ -400,8 +432,8 @@ if __name__ == '__main__':
 
     if args.mode == 'create_exp':
         cf = utils.prep_exp(args.dataset_name, args.exp_dir, args.server_env, use_stored_settings=False)
-        logger = utils.get_logger(cf.exp_dir, cf.server_env, -1)
-        logger.info('created experiment directory at {}'.format(args.exp_dir))
+        log = utils.get_logger(cf.exp_dir, cf.server_env, -1)
+        log.info('created experiment directory at {}'.format(args.exp_dir))
 
     elif args.mode == 'train' or args.mode == 'train_test':
         cf = utils.prep_exp(args.dataset_name, args.exp_dir, args.server_env, args.use_stored_settings)
@@ -416,10 +448,10 @@ if __name__ == '__main__':
         if args.data_dest is not None:
             cf.data_dest = args.data_dest
             
-        logger = utils.get_logger(cf.exp_dir, cf.server_env, cf.sysmetrics_interval)
+        log = utils.get_logger(cf.exp_dir, cf.server_env, cf.sysmetrics_interval)
         data_loader = utils.import_module('data_loader', os.path.join(args.dataset_name, 'data_loader.py'))
         model = utils.import_module('model', cf.model_path)
-        logger.info("loaded model from {}".format(cf.model_path))
+        log.info("loaded model from {}".format(cf.model_path))
         if folds is None:
             folds = range(cf.n_cv_splits)
 
@@ -429,23 +461,26 @@ if __name__ == '__main__':
             splits. k==folds, fold in [0,folds) says which split is used for testing.
             """
             cf.fold_dir = os.path.join(cf.exp_dir, 'fold_{}'.format(fold)); cf.fold = fold
-            logger.set_logfile(fold=fold)
+            log.set_logfile(fold=fold)
             cf.resume = resume
             if not os.path.exists(cf.fold_dir):
                 os.mkdir(cf.fold_dir)
-            train(cf, logger)
+                
+            #zzz
+                
+            train(cf, log)
             cf.resume = None
             if args.mode == 'train_test':
-                test(cf, logger)
+                test(cf, log)
 
     elif args.mode == 'test':
         cf = utils.prep_exp(args.dataset_name, args.exp_dir, args.server_env, use_stored_settings=True, is_training=False)
         if args.data_dest is not None:
             cf.data_dest = args.data_dest
-        logger = utils.get_logger(cf.exp_dir, cf.server_env, cf.sysmetrics_interval)
+        log = utils.get_logger(cf.exp_dir, cf.server_env, cf.sysmetrics_interval)
         data_loader = utils.import_module('data_loader', os.path.join(args.dataset_name, 'data_loader.py'))
         model = utils.import_module('model', cf.model_path)
-        logger.info("loaded model from {}".format(cf.model_path))
+        log.info("loaded model from {}".format(cf.model_path))
 
         fold_dirs = sorted([os.path.join(cf.exp_dir, f) for f in os.listdir(cf.exp_dir) if
                      os.path.isdir(os.path.join(cf.exp_dir, f)) and f.startswith("fold")])
@@ -458,24 +493,24 @@ if __name__ == '__main__':
             torch.backends.cudnn.benchmark = cf.cuda_benchmark
         for fold in folds:
             cf.fold_dir = os.path.join(cf.exp_dir, 'fold_{}'.format(fold)); cf.fold = fold
-            logger.set_logfile(fold=fold)
+            log.set_logfile(fold=fold)
             if cf.fold_dir in fold_dirs:
-                test(cf, logger, max_fold=max([int(f[-1]) for f in fold_dirs]))
+                test(cf, log, max_fold=max([int(f[-1]) for f in fold_dirs]))
             else:
-                logger.info("Skipping fold {} since no model parameters found.".format(fold))
+                log.info("Skipping fold {} since no model parameters found.".format(fold))
     # load raw predictions saved by predictor during testing, run aggregation algorithms and evaluation.
     elif args.mode == 'analysis':
         """ analyse already saved predictions.
         """
         cf = utils.prep_exp(args.dataset_name, args.exp_dir, args.server_env, use_stored_settings=True, is_training=False)
-        logger = utils.get_logger(cf.exp_dir, cf.server_env, cf.sysmetrics_interval)
+        log = utils.get_logger(cf.exp_dir, cf.server_env, cf.sysmetrics_interval)
 
         if cf.hold_out_test_set and cf.ensemble_folds:
-            predictor = Predictor(cf, net=None, logger=logger, mode='analysis')
+            predictor = Predictor(cf, net=None, logger=log, mode='analysis')
             results_list = predictor.load_saved_predictions()
-            logger.info('starting evaluation...')
+            log.info('starting evaluation...')
             cf.fold = "overall"
-            evaluator = Evaluator(cf, logger, mode='test')
+            evaluator = Evaluator(cf, log, mode='test')
             evaluator.evaluate_predictions(results_list)
             evaluator.score_test_df(max_fold=cf.fold)
         else:
@@ -488,26 +523,26 @@ if __name__ == '__main__':
                 folds = range(cf.n_cv_splits)
             for fold in folds:
                 cf.fold = fold; cf.fold_dir = os.path.join(cf.exp_dir, 'fold_{}'.format(cf.fold))
-                logger.set_logfile(fold=fold)
+                log.set_logfile(fold=fold)
                 if cf.fold_dir in fold_dirs:
-                    predictor = Predictor(cf, net=None, logger=logger, mode='analysis')
+                    predictor = Predictor(cf, net=None, logger=log, mode='analysis')
                     results_list = predictor.load_saved_predictions()
                     # results_list[x][1] is pid, results_list[x][0] is list of len samples-per-patient, each entry hlds
                     # list of boxes per that sample, i.e., len(results_list[x][y][0]) would be nr of boxes in sample y of patient x
-                    logger.info('starting evaluation...')
-                    evaluator = Evaluator(cf, logger, mode='test')
+                    log.info('starting evaluation...')
+                    evaluator = Evaluator(cf, log, mode='test')
                     evaluator.evaluate_predictions(results_list)
                     max_fold = max([int(f[-1]) for f in fold_dirs])
                     evaluator.score_test_df(max_fold=max_fold)
                 else:
-                    logger.info("Skipping fold {} since no model parameters found.".format(fold))
+                    log.info("Skipping fold {} since no model parameters found.".format(fold))
     else:
         raise ValueError('mode "{}" specified in args is not implemented.'.format(args.mode))
         
     mins, secs = divmod((time.time() - stime), 60)
     h, mins = divmod(mins, 60)
     t = "{:d}h:{:02d}m:{:02d}s".format(int(h), int(mins), int(secs))
-    logger.info("{} total runtime: {}".format(os.path.split(__file__)[1], t))
-    del logger
+    log.info("{} total runtime: {}".format(os.path.split(__file__)[1], t))
+    del log
     torch.cuda.empty_cache()
 
